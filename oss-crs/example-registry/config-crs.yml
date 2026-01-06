@@ -1,0 +1,10 @@
+run_env:
+
+
+
+buttercup-bugfind:
+  ncpu: 1-all
+  build:
+    dockerfile: oss-crs/builder.Dockerfile
+  run:
+    dockerfile: oss-crs/runner.Dockerfile

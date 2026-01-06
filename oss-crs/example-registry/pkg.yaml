@@ -1,0 +1,6 @@
+name: buttercup-bugfind
+type: bug-finding
+source:
+  local_path: /home/hanqing/agents/CRSes/buttercup
+  # url: https://github.com/trailofbits/buttercup
+  # ref: main
