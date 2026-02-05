@@ -1,0 +1,9 @@
+ARG parent_image
+FROM $parent_image
+
+# Copy build script
+COPY builder-default.sh /builder-default.sh
+RUN chmod +x /builder-default.sh
+
+# Run the builder - creates ChallengeTask-compatible structure in /artifacts
+CMD ["/builder-default.sh"]

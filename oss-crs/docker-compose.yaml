@@ -1,0 +1,171 @@
+# OSS-CRS Multi-Container Workflow with Vanilla Buttercup Services
+#
+# Architecture:
+# BUILD PHASE (separate):
+#     builder.Dockerfile.default  ->  /artifacts/task/ (ChallengeTask structure)
+#     builder.Dockerfile.coverage ->  /artifacts/coverage/
+#
+# RUN PHASE (this compose):
+#     orchestrator (one-shot) -> Redis -> vanilla buttercup services
+#
+# The builder phase creates a ChallengeTask-compatible directory structure:
+#     /artifacts/task/task_meta.json
+#     /artifacts/task/src/
+#     /artifacts/task/fuzz-tooling/
+#     /artifacts/task/fuzz-tooling/build/out/{project}/
+#
+# NOTE: All services use /artifacts as their working directory and NODE_DATA_DIR.
+# Buttercup writes corpus to /artifacts/{task_id}/buttercup_corpus_{harness}/
+# but oss-crs expects corpus in /artifacts/corpus/, so a syncer service
+# periodically copies files between these paths.
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  orchestrator:
+    image: buttercup-runner
+    command: ["python", "/crs/orchestrator.py"]
+    depends_on:
+      - redis:
+          condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - TASK_DIR=/artifacts/task
+      - COVERAGE_DIR=/artifacts/coverage
+    # volumes provided by oss-crs
+
+  # Vanilla buttercup fuzzer-bot
+  fuzzer-bot:
+    image: buttercup-runner
+    command: ["buttercup-fuzzer"]
+    depends_on:
+      - redis:
+          condition: service_healthy
+      - orchestrator:
+          condition: service_started
+    environment:
+      # Fuzzer bot settings (BUTTERCUP_FUZZER_ prefix)
+      - BUTTERCUP_FUZZER_REDIS_URL=redis://redis:6379
+      - BUTTERCUP_FUZZER_TIMER=5000
+      - BUTTERCUP_FUZZER_WDIR=/artifacts
+      - BUTTERCUP_FUZZER_CRS_SCRATCH_DIR=/artifacts
+      - BUTTERCUP_FUZZER_RUNNER_PATH=/app/fuzzer_runner/runner.sh
+      - BUTTERCUP_FUZZER_TIMEOUT=60000
+      - BUTTERCUP_FUZZER_LOG_LEVEL=INFO
+      # Node local storage - same as WDIR for path validation
+      - NODE_DATA_DIR=/artifacts
+    volumes:
+      # artifacts provided by oss-crs
+      - /var/run/docker.sock:/var/run/docker.sock
+    tmpfs:
+      # Scratch space for temporary files (not for corpus/povs)
+      - /crs_scratch:size=2G,exec
+    deploy:
+      resources:
+        limits:
+          cpus: "${FUZZER_CPUS:-2}"
+          memory: "${FUZZER_MEMORY:-4G}"
+
+  # Vanilla buttercup coverage-bot
+  coverage-bot:
+    image: buttercup-runner
+    command: ["buttercup-coverage-bot"]
+    depends_on:
+      - redis:
+          condition: service_healthy
+      - orchestrator:
+          condition: service_started
+    environment:
+      - BUTTERCUP_FUZZER_REDIS_URL=redis://redis:6379
+      - BUTTERCUP_FUZZER_TIMER=30000
+      - BUTTERCUP_FUZZER_WDIR=/artifacts
+      - BUTTERCUP_FUZZER_ALLOW_PULL=false
+      - BUTTERCUP_FUZZER_LOG_LEVEL=INFO
+      # Node local storage - same as WDIR for path validation
+      - NODE_DATA_DIR=/artifacts
+    volumes:
+      # artifacts provided by oss-crs
+      - /var/run/docker.sock:/var/run/docker.sock
+    tmpfs:
+      # Scratch space for temporary files
+      - /crs_scratch:size=1G,exec
+    deploy:
+      resources:
+        limits:
+          cpus: "${COVERAGE_CPUS:-1}"
+          memory: "${COVERAGE_MEMORY:-2G}"
+
+  # Vanilla buttercup seed-gen
+  seed-gen:
+    image: buttercup-runner
+    command: ["seed-gen", "server"]
+    depends_on:
+      - redis:
+          condition: service_healthy
+      - orchestrator:
+          condition: service_started
+    environment:
+      # Seed-gen settings (BUTTERCUP_SEED_GEN_ prefix)
+      - BUTTERCUP_SEED_GEN_SERVER__REDIS_URL=redis://redis:6379
+      - BUTTERCUP_SEED_GEN_SERVER__SLEEP_TIME=10
+      - BUTTERCUP_SEED_GEN_SERVER__CORPUS_ROOT=/artifacts/corpus
+      - BUTTERCUP_SEED_GEN_WDIR=/artifacts
+      - BUTTERCUP_SEED_GEN_LOG_LEVEL=INFO
+      # Node local storage - same as WDIR for path validation
+      - NODE_DATA_DIR=/artifacts
+      # LLM configuration (required for seed-gen)
+      - BUTTERCUP_LITELLM_HOSTNAME=${LITELLM_URL:-}
+      - BUTTERCUP_LITELLM_KEY=${LITELLM_KEY:-}
+    volumes:
+      # artifacts provided by oss-crs
+      - /var/run/docker.sock:/var/run/docker.sock
+    tmpfs:
+      # Scratch space for temporary files
+      - /crs_scratch:size=2G,exec
+    deploy:
+      resources:
+        limits:
+          cpus: "${SEEDGEN_CPUS:-1}"
+          memory: "${SEEDGEN_MEMORY:-4G}"
+
+  # Syncer - periodically copies corpus/povs from buttercup paths to oss-crs paths
+  # Buttercup writes to: /artifacts/{task_id}/buttercup_corpus_{harness}/
+  # oss-crs expects:     /artifacts/corpus/
+  syncer:
+    image: buttercup-runner
+    command:
+      - /bin/bash
+      - -c
+      - |
+        echo "Syncer started"
+        while true; do
+          # Sync corpus files (from any task/harness to /artifacts/corpus/)
+          for dir in /artifacts/*/buttercup_corpus_*/; do
+            if [ -d "$$dir" ]; then
+              rsync -a --ignore-existing "$$dir" /artifacts/corpus/ 2>/dev/null || true
+            fi
+          done
+          # Sync PoV files (crashes)
+          for dir in /artifacts/*/buttercup_crashes_*/; do
+            if [ -d "$$dir" ]; then
+              rsync -a --ignore-existing "$$dir" /artifacts/povs/ 2>/dev/null || true
+            fi
+          done
+          sleep 10
+        done
+    depends_on:
+      - fuzzer-bot:
+          condition: service_started
+    # artifacts volume provided by oss-crs
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: "128M"

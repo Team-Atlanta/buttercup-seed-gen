@@ -12,7 +12,7 @@ from buttercup.common.default_task_loop import TaskLoop
 from buttercup.common.logger import setup_package_logger
 from buttercup.common.node_local import scratch_dir
 from buttercup.common.queues import QueueFactory, QueueNames
-from buttercup.common.stack_parsing import CrashSet
+from buttercup.common.crash_set import CrashSet
 from buttercup.common.telemetry import CRSActionCategory, init_telemetry, set_crs_attributes
 from buttercup.common.types import FuzzConfiguration
 from buttercup.common.utils import setup_periodic_zombie_reaper

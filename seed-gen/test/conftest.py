@@ -8,7 +8,7 @@ import pytest
 from buttercup.common.challenge_task import ChallengeTask
 from buttercup.common.project_yaml import Language, ProjectYaml
 from buttercup.common.reproduce_multiple import ReproduceMultiple
-from buttercup.common.stack_parsing import CrashSet
+from buttercup.common.crash_set import CrashSet
 from buttercup.common.task_meta import TaskMeta
 from buttercup.program_model.codequery import CodeQueryPersistent
 from langchain_core.language_models import BaseChatModel

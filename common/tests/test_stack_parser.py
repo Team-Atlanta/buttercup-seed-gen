@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 from redis import Redis
 
-from buttercup.common.stack_parsing import CrashSet, get_crash_data, get_inst_key, parse_stacktrace
+from buttercup.common.crash_set import CrashSet, get_crash_data, get_inst_key, parse_stacktrace
 
 # ruff: noqa: E501
 

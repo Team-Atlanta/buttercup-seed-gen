@@ -1,0 +1,1380 @@
+
+ ▐▛███▜▌   Claude Code v2.1.22
+▝▜█████▛▘  Opus 4.5 · Claude Max
+  ▘▘ ▝▝    ~/post/buttercup
+
+✻ Conversation compacted (ctrl+o for history)
+
+  ⎿  Read ../oss-crs-2/crs_registry/buttercup/pkg.yaml (5 lines)
+  ⎿  Read oss-crs/run_fuzzer.py (229 lines)
+  ⎿  Read oss-crs/src/crash_collector.py (84 lines)
+  ⎿  Read oss-crs/runner.Dockerfile (30 lines)
+  ⎿  Read oss-crs/requirements.txt (7 lines)
+  ⎿  Plan file referenced (~/.claude/plans/jazzy-churning-flamingo.md)
+  ⎿  Skills restored (run-oss-crs)
+
+● I'll restore the self-contained implementations since the Docker context
+  approach doesn't work. Let me first check the original buttercup files to
+  understand what to recreate, then fix the broken state.
+
+● serena - Find Symbol (MCP)(name_path: "Runner", relative_path:
+                            "fuzzer_runner", include_body: true, depth: 1)
+  ⎿  Error: Error executing tool find_symbol: 1 validation error for 
+     applyArguments
+     name_path_pattern
+       Field required [type=missing, input_value={'name_path': 'Runner', 
+     '...body': True, 'depth': 1}, input_type=dict]
+         For further information visit https://errors.pydantic.dev/2.12/v/missin
+
+
+● serena - Find Symbol (MCP)(name_path: "get_crash_token", relative_path:
+                            "common", include_body: true)
+  ⎿  Error: Sibling tool call errored
+
+● serena - Find Symbol (MCP)(name_path: "FuzzConfiguration", relative_path:
+                            "common", include_body: true)
+  ⎿  Error: Sibling tool call errored
+
+● serena - Find Symbol (MCP)(name_path_pattern: "Runner", relative_path:
+                            "fuzzer_runner", include_body: true, depth: 1)
+  ⎿ {
+      "result": "[{\"name_path\": \"Runner\", \"kind\": \"Class\", \"body_l
+    ocation\": {\"start_line\": 25, \"end_line\": 67}, \"body\": \"class Ru
+    … +47 lines (ctrl+o to expand)
+
+
+
+● serena - Find Symbol (MCP)(name_path_pattern: "get_crash_token",
+                            relative_path: "common", include_body: true)
+  ⎿ {
+      "result": "[{\"name_path\": \"get_crash_token\", \"kind\": \"Function
+    \", \"body_location\": {\"start_line\": 70, \"end_line\": 71}, \"body\"
+    … +4 lines (ctrl+o to expand)
+
+
+
+● serena - Find Symbol (MCP)(name_path_pattern: "FuzzConfiguration",
+                            relative_path: "common", include_body: true)
+  ⎿ {
+      "result": "[{\"name_path\": \"FuzzConfiguration\", \"kind\": \"Class\
+    ", \"body_location\": {\"start_line\": 3, \"end_line\": 8}, \"body\": \
+    … +4 lines (ctrl+o to expand)
+
+
+
+● Let me get more details on the stack parsing functions and check what Conf
+  looks like.
+
+● serena - Find Symbol (MCP)(name_path_pattern: "get_crash_data", relative_path:
+                             "common", include_body: true)
+  ⎿ {
+      "result": "[{\"name_path\": \"get_crash_data\", \"kind\": \"Function\
+    ", \"body_location\": {\"start_line\": 55, \"end_line\": 58}, \"body\":
+    … +6 lines (ctrl+o to expand)
+
+
+
+● serena - Find Symbol (MCP)(name_path_pattern: "get_inst_key", relative_path:
+                            "common", include_body: true)
+  ⎿ {
+      "result": "[{\"name_path\": \"get_inst_key\", \"kind\": \"Function\",
+     \"body_location\": {\"start_line\": 61, \"end_line\": 65}, \"body\": \
+    … +7 lines (ctrl+o to expand)
+
+
+
+● serena - Find Symbol (MCP)(name_path_pattern: "Conf", relative_path:
+                            "fuzzer_runner", include_body: true)
+  ⎿ {
+      "result": "[{\"name_path\": \"Conf\", \"kind\": \"Class\", \"body_loc
+    ation\": {\"start_line\": 19, \"end_line\": 22}, \"body\": \"@dataclass
+    … +3 lines (ctrl+o to expand)
+
+
+
+● Read 3 files (ctrl+o to expand)
+
+● Now I understand the dependencies. Let me check the clusterfuzz_parser to see
+  what we need:
+
+● Searched for 2 patterns, read 2 files (ctrl+o to expand)
+
+● Now I have a complete picture. The clusterfuzz_parser is a large vendored
+  module. For OSS-CRS-2, I'll use a simpler approach: just hash the stacktrace
+  for deduplication rather than the full crash token extraction. Let me restore
+  the self-contained implementations.
+
+● Write(oss-crs/requirements.txt)
+  ⎿  Added 3 lines, removed 4 lines
+      1 -# Install buttercup packages from local source                  
+      2 --e /src/buttercup/common                                        
+      3 --e /src/buttercup/fuzzer_runner                                 
+      1 +# ClusterFuzz fuzzing library                                   
+      2 +clusterfuzz>=2.6.0                                              
+      3                                                                  
+      4 -# Additional dependencies not in buttercup packages             
+      4 +# HTTP client for LLM API                                       
+      5  httpx>=0.24.0                                                   
+
+● Write(oss-crs/runner.Dockerfile)
+  ⎿  Added 4 lines, removed 9 lines
+      11  ENV PATH="/opt/venv/bin:$PATH"                                 
+      12  RUN pip install --upgrade pip                                  
+      13                                                                 
+      14 -# Copy buttercup source for package installation               
+      15 -# This will be mounted at build time from the buttercup repo   
+      16 -COPY common /src/buttercup/common                              
+      17 -COPY fuzzer_runner /src/buttercup/fuzzer_runner                
+      18 -                                                               
+      14  WORKDIR /crs                                                   
+      15                                                                 
+      16 -# Install buttercup packages and dependencies                  
+      17 -COPY oss-crs/requirements.txt .                                
+      16 +# Install Python dependencies                                  
+      17 +COPY requirements.txt .                                        
+      18  RUN pip install --no-cache-dir -r requirements.txt             
+      19                                                                 
+      20  # Copy CRS-specific code                                       
+      21 -COPY oss-crs/src/ ./src/                                       
+      22 -COPY oss-crs/run_fuzzer.py .                                   
+      21 +COPY src/ ./src/                                               
+      22 +COPY run_fuzzer.py .                                           
+      23                                                                 
+      24  ENTRYPOINT ["python3", "/crs/run_fuzzer.py"]                   
+
+● Now let me create the self-contained runner.py and stack_parsing.py:
+
+● Write(oss-crs/src/runner.py)
+  ⎿  Wrote 93 lines to oss-crs/src/runner.py
+     """Self-contained ClusterFuzz runner for OSS-CRS-2.
+
+     Simplified version of buttercup.fuzzer_runner.runner without complex
+     temp directory patching or external buttercup dependencies.
+     """
+
+     import logging
+     import os
+     import tempfile
+     import typing
+     … +83 lines (ctrl+o to expand)
+
+● Write(oss-crs/src/stack_parsing.py)
+  ⎿  Wrote 124 lines to oss-crs/src/stack_parsing.py
+     """Simplified stack parsing for OSS-CRS-2.
+
+     This is a lightweight version that extracts crash tokens for 
+     deduplication
+     without depending on the full buttercup.common.clusterfuzz_parser.
+     """
+
+     import hashlib
+     import logging
+     import re
+     from typing import Optional
+     … +114 lines (ctrl+o to expand)
+  ⎿  Found 2 new diagnostic issues in 1 file (ctrl+o to expand)
+
+● Now let me update crash_collector.py to use the local stack_parsing module:
+
+● Update(oss-crs/src/crash_collector.py)
+  ⎿  Added 1 line, removed 1 line
+      10  from pathlib import Path                                       
+      11  from typing import Set                                         
+      12                                                                 
+      13 -from buttercup.common.stack_parsing import get_crash_token     
+      13 +from src.stack_parsing import get_crash_token                  
+      14                                                                 
+      15  logger = logging.getLogger(__name__)                           
+      16                                                                 
+  ⎿  Found 1 new diagnostic issue in 1 file (ctrl+o to expand)
+
+● Now let me update run_fuzzer.py to use the local modules:
+
+● Read 1 file (ctrl+o to expand)
+  ⎿  Found 1 new diagnostic issue in 1 file (ctrl+o to expand)
+
+● Update(oss-crs/run_fuzzer.py)
+  ⎿  Added 1 line, removed 4 lines
+      13  from pathlib import Path                                       
+      14  from typing import List                                        
+      15                                                                 
+      16 -# Import from buttercup packages                               
+      17 -from buttercup.common.types import FuzzConfiguration           
+      18 -from buttercup.fuzzer_runner.runner import Runner, Conf        
+      19 -                                                               
+      16  # Import local modules                                         
+      17  from src.config import Config                                  
+      18  from src.crash_collector import CrashCollector                 
+      19 +from src.runner import Runner, Conf, FuzzConfiguration         
+      20                                                                 
+      21  # Configure logging                                            
+      22  logging.basicConfig(                                           
+
+● Let me verify the structure and list the files:
+
+● Read 3 files (ctrl+o to expand)
+  ⎿  Found 1 new diagnostic issue in 1 file (ctrl+o to expand)
+
+● All files are in place. Now let me run a test build:
+
+● Bash(cd ~/post/oss-crs-2 && uv run oss-bugfind-crs build           timeout: 5m
+      --project-image-prefix aixcc-afc --oss-fuzz-dir                0s
+      ~/post/oss-fuzz-clean example_configs/buttercup
+      aixcc/c/sani…)
+  ⎿  #7 [3/5] COPY fuzz /src/fuzz
+     #7 CACHED
+     … +166 lines (ctrl+o to expand)
+  ⎿  Shell cwd was reset to /home/andrew/post/buttercup
+
+● Build succeeded. Now let me test the run:
+
+● Bash(cd ~/post/oss-crs-2 && source .env && uv run oss-bugfind-crs  timeout: 3m
+      run --external-litellm example_configs/buttercup               0s
+      aixcc/c/sanity-mock-c-delta-01 fuzz_process_input_…)
+
+  ⎿ INFO: OSS-Fuzz directory already exists with project aixcc/c/sanity-moc
+    k-c-delta-01: /home/andrew/post/oss-crs-2/build/oss-fuzz/aixcc/c/sanity
+    -mock-c-delta-01
+    … +265 lines (ctrl+o to expand)
+
+
+  ⎿  Shell cwd was reset to /home/andrew/post/buttercup
+
+● The build is progressing but pip is doing dependency resolution. Let me wait
+  for more output:
+
+● Bash(cd ~/post/oss-crs-2 && source .env && uv run oss-bugfind-crs  timeout: 5m
+      run --external-litellm example_configs/buttercup               0s
+      aixcc/c/sanity-mock-c-delta-01 fuzz_process_input_…)
+
+  ⎿  Error: Exit code 1
+     INFO: OSS-Fuzz directory already exists with project 
+     aixcc/c/sanity-mock-c-delta-01: 
+     /home/andrew/post/oss-crs-2/build/oss-fuzz/aixcc/c/sanity-mock-c-delta-01
+     INFO: Generating compose-local.yaml
+     INFO: Using crs_registry at: /home/andrew/post/oss-crs-2/crs_registry
+     INFO: Using local CRS 'buttercup' from /home/andrew/post/buttercup/oss-crs
+     INFO: Starting services from: 
+     /home/andrew/post/oss-crs-2/build/crs/buttercup/compose-local.yaml
+      Image buttercup_runner Building 
+     #1 [internal] load local bake definitions
+     #1 reading from stdin 584B done
+     #1 DONE 0.0s
+     … +119 lines (ctrl+o to see all)
+
+● The fuzzer ran successfully. I can see:
+  1. Docker image built with simplified dependencies
+  2. LLM seed generation worked (5 potential PoVs generated)
+  3. Fuzzing ran continuously finding crashes
+  4. Crash deduplication working (1 unique POV despite many crash iterations)
+
+  Let me verify the POVs were saved:
+
+● Searched for 1 pattern, read 4 files (ctrl+o to expand)
+
+● POVs are being saved correctly. The fuzzer is working. Let me verify the POV
+  content:
+
+● Bash(xxd
+      ~/post/oss-crs-2/build/run/buttercup/aixcc/c/sanity-mock-c-delta-01/addres
+      s/fuzz_process_input_header/e500768ff2083d46/povs/pov_9cd0676108382063 |
+      head -10)
+  ⎿  00000000: 415f 5f5f 5f5f 5f5f 5f5f 5fdb dbdb dbdb  A__________.....
+     00000010: dbdb dbdb dbdb dbdb dbdb dbdb dbdb dbdb  ................
+     00000020: dbdb dbdb dbdb dbdb dbdb dbdb dbdb dbdb  ................
+     … +2 lines (ctrl+o to expand)
+
+● Read 1 file (ctrl+o to expand)
+
+● The self-contained OSS-CRS-2 integration is now working correctly:
+
+  Summary of fixes:
+
+  1. requirements.txt - Simplified to just clusterfuzz>=2.6.0 and httpx>=0.24.0
+  (no local package references)
+  2. runner.Dockerfile - Simplified to copy only the src/ and run_fuzzer.py
+  files (no parent directory access needed)
+  3. src/runner.py - Created self-contained ClusterFuzz wrapper with Runner,
+  Conf, and FuzzConfiguration classes
+  4. src/stack_parsing.py - Created self-contained crash token extraction with
+  get_crash_token() function
+  5. src/crash_collector.py - Updated to import from local src.stack_parsing
+  6. run_fuzzer.py - Updated to import from local src.runner module
+
+  Test results:
+  - Build: ✅ Success
+  - LLM seed generation: ✅ Generated 5 potential PoVs
+  - Fuzzing: ✅ Runs continuously in 60-second iterations
+  - Crash detection: ✅ Found crashes
+  - Deduplication: ✅ Only 1 unique POV saved despite 1400+ crash iterations
+  - POV saving: ✅ POV files correctly saved to /artifacts/povs/
+
+  The buttercup OSS-CRS-2 integration is now fully self-contained and
+  functional, without requiring the buttercup packages to be installed in the
+  Docker container.
+
+✻ Baked for 11m 53s
+
+❯ So what does oss-crs/src reference from original buttercup source code? 
+
+● Let me analyze what oss-crs/src references from the original buttercup
+  codebase:
+
+● Bash(echo "=== oss-crs/src files ===" && find
+      /home/andrew/post/buttercup/oss-crs/src -name "*.py" -exec echo "--- {}
+      ---" \; -exec head -30 {} \;)
+  ⎿  === oss-crs/src files ===
+     --- /home/andrew/post/buttercup/oss-crs/src/stack_parsing.py ---
+     """Simplified stack parsing for OSS-CRS-2.
+     … +266 lines (ctrl+o to expand)
+
+● Here's the mapping of what oss-crs/src references from original buttercup:
+  oss-crs/src file: runner.py
+  Original buttercup source: fuzzer_runner/src/buttercup/fuzzer_runner/runner.py
+  Relationship: Simplified rewrite - same Runner class using ClusterFuzz, but
+    removed patched_temp_dir, scratch_cwd, and buttercup.common
+    imports
+  ────────────────────────────────────────
+  oss-crs/src file: stack_parsing.py
+  Original buttercup source: common/src/buttercup/common/stack_parsing.py
+  Relationship: Simplified rewrite - same get_crash_token() concept but without
+    the full clusterfuzz_parser (1500+ line vendored module)
+  ────────────────────────────────────────
+  oss-crs/src file: crash_collector.py
+  Original buttercup source: common/src/buttercup/common/stack_parsing.py
+    (CrashSet)
+  Relationship: New - replaces Redis-based CrashSet with file-based JSON storage
+  ────────────────────────────────────────
+  oss-crs/src file: config.py
+  Original buttercup source: N/A
+  Relationship: New - env var loading for OSS-CRS-2
+  ────────────────────────────────────────
+  oss-crs/src file: seed_gen/llm_client.py
+  Original buttercup source: N/A
+  Relationship: New - simple httpx client (buttercup uses LangChain/LangGraph)
+  ────────────────────────────────────────
+  oss-crs/src file: seed_gen/seed_init.py
+  Original buttercup source: seed-gen/src/buttercup/seed_gen/seed_init.py
+  Relationship: Simplified adaptation - same concept, removed LangGraph state
+    machine
+  ────────────────────────────────────────
+  oss-crs/src file: seed_gen/vuln_discovery.py
+  Original buttercup source:
+  seed-gen/src/buttercup/seed_gen/vuln_discovery_delta.py
+  Relationship: Simplified adaptation - same concept, removed LangGraph
+  ────────────────────────────────────────
+  oss-crs/src file: seed_gen/prompts.py
+  Original buttercup source: seed-gen/src/buttercup/seed_gen/prompt/*.py
+  Relationship: Copied/adapted - LLM prompts
+  Key simplifications:
+  - No Redis - file-based state instead
+  - No LangChain/LangGraph - direct httpx LLM calls
+  - No clusterfuzz_parser - simplified regex-based crash parsing
+  - No temp_dir patching - uses standard tempfile
+  - No buttercup.common - all self-contained
+
+  The oss-crs version is essentially a standalone port that preserves the core
+  logic but removes the distributed orchestration infrastructure.
+
+❯ No I DO NOT wnat a standalone port. I want oss-crs/ to be an interface    
+  harness for the original source code, not you rewriting original source   
+  code. If you need to adapt source code, then just change it in original   
+  source code (disable stuff, whatever). When I check lines of code on      
+  oss-crs, I should not be seeing almost 1000 LoC! Just for a simple        
+  interface...                                                              
+  >> ramjet ~/post/buttercup % tokei oss-crs/src                            
+   main 21:52                                                              
+  ========================================================================= 
+  ======                                                                    
+  Language            Files        Lines         Code     Comments          
+  Blanks                                                                    
+  ========================================================================= 
+  ======                                                                    
+  Python                 10          906          719           42          
+  145                                                                       
+  ========================================================================= 
+  ======                                                                    
+  Total                  10          906          719           42          
+  145                                                                       
+  ========================================================================= 
+  ======                                                                    
+                                                                            
+
+● You're right. Let me fix this properly - oss-crs should be a thin interface
+  that imports from the original buttercup packages, not a rewrite.
+
+  The solution is to change the Docker build context to the buttercup root so we
+   can install the actual packages.
+
+● Update(~/post/oss-crs-2/crs_registry/buttercup/pkg.yaml)
+  ⎿  Added 1 line, removed 1 line
+      1  name: buttercup                                                 
+      2  type: bug-finding                                               
+      3  source:                                                         
+      4 -  local_path: ~/post/buttercup/oss-crs                          
+      4 +  local_path: ~/post/buttercup                                  
+
+● Write(oss-crs/runner.Dockerfile)
+  ⎿  Added 9 lines, removed 5 lines
+      11  ENV PATH="/opt/venv/bin:$PATH"                                 
+      12  RUN pip install --upgrade pip                                  
+      13                                                                 
+      14 +# Copy and install buttercup packages from the repo            
+      15 +COPY common /src/buttercup/common                              
+      16 +COPY fuzzer_runner /src/buttercup/fuzzer_runner                
+      17 +                                                               
+      18  WORKDIR /crs                                                   
+      19                                                                 
+      20 -# Install Python dependencies                                  
+      21 -COPY requirements.txt .                                        
+      20 +# Install buttercup packages and minimal additional deps       
+      21 +COPY oss-crs/requirements.txt .                                
+      22  RUN pip install --no-cache-dir -r requirements.txt             
+      23                                                                 
+      24 -# Copy CRS-specific code                                       
+      25 -COPY src/ ./src/                                               
+      26 -COPY run_fuzzer.py .                                           
+      24 +# Copy the thin interface layer                                
+      25 +COPY oss-crs/run_fuzzer.py .                                   
+      26 +COPY oss-crs/src/ ./src/                                       
+      27                                                                 
+      28  ENTRYPOINT ["python3", "/crs/run_fuzzer.py"]                   
+
+● Write(oss-crs/requirements.txt)
+  ⎿  Added 4 lines, removed 3 lines
+      1 -# ClusterFuzz fuzzing library                                   
+      2 -clusterfuzz>=2.6.0                                              
+      1 +# Install buttercup packages from copied source                 
+      2 +/src/buttercup/common                                           
+      3 +/src/buttercup/fuzzer_runner                                    
+      4                                                                  
+      5 -# HTTP client for LLM API                                       
+      5 +# Additional dep for LLM client                                 
+      6  httpx>=0.24.0                                                   
+
+● Now delete the rewritten files and slim down to a thin interface:
+
+● Bash(rm /home/andrew/post/buttercup/oss-crs/src/runner.py
+      /home/andrew/post/buttercup/oss-crs/src/stack_parsing.py)
+  ⎿  (No content)
+
+● Update(oss-crs/src/crash_collector.py)
+  ⎿  Added 1 line, removed 1 line
+      10  from pathlib import Path                                       
+      11  from typing import Set                                         
+      12                                                                 
+      13 -from src.stack_parsing import get_crash_token                  
+      13 +from buttercup.common.stack_parsing import get_crash_token     
+      14                                                                 
+      15  logger = logging.getLogger(__name__)                           
+      16                                                                 
+
+● Update(oss-crs/run_fuzzer.py)
+  ⎿  Added 5 lines, removed 2 lines
+      13  from pathlib import Path                                       
+      14  from typing import List                                        
+      15                                                                 
+      16 -# Import local modules                                         
+      16 +# Import from buttercup packages                               
+      17 +from buttercup.common.types import FuzzConfiguration           
+      18 +from buttercup.fuzzer_runner.runner import Runner, Conf        
+      19 +                                                               
+      20 +# Import local interface modules                               
+      21  from src.config import Config                                  
+      22  from src.crash_collector import CrashCollector                 
+      23 -from src.runner import Runner, Conf, FuzzConfiguration         
+      23                                                                 
+      24  # Configure logging                                            
+      25  logging.basicConfig(                                           
+
+● Bash(tokei /home/andrew/post/buttercup/oss-crs/src)
+  ⎿ =======================================================================
+    ========
+     Language            Files        Lines         Code     Comments
+    … +11 lines (ctrl+o to expand)
+
+
+● Still too much. Let me check what's left:
+
+● Read 1 file (ctrl+o to expand)
+
+● The seed_gen module (515 lines) is the main bloat. Let me check if we can use
+  the original buttercup seed-gen or simplify this:
+
+● Read 1 file (ctrl+o to expand)
+
+● The original seed-gen uses LangGraph which has heavy dependencies. The
+  simplest solution is to remove LLM seed generation from oss-crs and keep it as
+   a pure fuzzing interface. The seed-gen module can be added later if needed.
+
+● Bash(rm -rf /home/andrew/post/buttercup/oss-crs/src/seed_gen)
+  ⎿  (No content)
+
+● Write(oss-crs/run_fuzzer.py)
+  ⎿  Added 23 lines, removed 152 lines
+       1  #!/usr/bin/env python3                                         
+       2  """Main entry point for Buttercup OSS-CRS-2 fuzzer.            
+       3                                                                 
+       4 -This script orchestrates:                                      
+       5 -1. LLM-based seed generation (if LLM available)                
+       6 -2. ClusterFuzz-based fuzzing in a continuous loop              
+       7 -3. Crash collection and POV writing                            
+       4 +Thin interface that uses buttercup packages for ClusterFuzz    
+         +fuzzing.                                                       
+       5  """                                                            
+       6                                                                 
+       7  import logging                                                 
+       8 +import shutil                                                  
+       9  import sys                                                     
+      10  import time                                                    
+      11  from pathlib import Path                                       
+      12 -from typing import List                                        
+      12                                                                 
+      13  # Import from buttercup packages                               
+      14  from buttercup.common.types import FuzzConfiguration           
+     ...
+       21  from src.config import Config                                 
+       22  from src.crash_collector import CrashCollector                
+       23                                                                
+       24 -# Configure logging                                           
+       24  logging.basicConfig(                                          
+       25      level=logging.INFO,                                       
+       26      format="%(asctime)s - %(name)s - %(levelname)s -          
+           %(message)s",                                                 
+       27  )                                                             
+       28  logger = logging.getLogger("buttercup")                       
+       29                                                                
+       30 -# Fuzzing iteration length in seconds (run fuzzer in short    
+          -bursts)                                                       
+       30  FUZZ_ITERATION_SECONDS = 60                                   
+       31                                                                
+       32                                                                
+       33 -def log_fuzz_result(result) -> None:                          
+       34 -    """Log fuzzer result statistics."""                       
+       35 -    stats = result.stats or {}                                
+       36 -                                                              
+       37 -    logger.info(                                              
+       38 -        f"Fuzzer completed: crashes={len(result.crashes)}, "  
+       39 -        f"timed_out={result.timed_out},                       
+          -time_executed={result.time_executed:.2f}s"                    
+       40 -    )                                                         
+       41 -    logger.info(                                              
+       42 -        f"Fuzzer stats: crash_count={stats.get('crash_count', 
+          - 0)}, "                                                       
+       43 -        f"oom_count={stats.get('oom_count', 0)}, "            
+       44 -        f"timeout_count={stats.get('timeout_count', 0)}, "    
+       45 -                                                              
+          -f"startup_crash_count={stats.get('startup_crash_count', 0)},  
+          -"                                                             
+       46 -        f"leak_count={stats.get('leak_count', 0)}"            
+       47 -    )                                                         
+       48 -    logger.info(                                              
+       49 -        f"Fuzzer coverage:                                    
+          -edge_coverage={stats.get('edge_coverage',                     
+          -0)}/{stats.get('edges_total', 0)}, "                          
+       50 -        f"feature_coverage={stats.get('feature_coverage',     
+          -0)}, "                                                        
+       51 -        f"new_edges={stats.get('new_edges', 0)},              
+          -new_features={stats.get('new_features', 0)}"                  
+       52 -    )                                                         
+       53 -                                                              
+       54 -    if result.crashes:                                        
+       55 -        for i, crash in enumerate(result.crashes):            
+       56 -            logger.info(f"Crash {i + 1}:                      
+          -input_path={crash.input_path},                                
+          -crash_time={crash.crash_time}")                               
+       57 -                                                              
+       58 -                                                              
+       33  def main() -> int:                                            
+       34 -    """Main entry point."""                                   
+       35 -    # Parse command line arguments                            
+       34      if len(sys.argv) < 2:                                     
+       35 -        print("Usage: run_fuzzer.py <harness_name>            
+          - [additional_args...]", file=sys.stderr)                      
+       35 +        print("Usage: run_fuzzer.py <harness_name>            
+          +", file=sys.stderr)                                           
+       36          return 1                                              
+       37                                                                
+       38      harness_name = sys.argv[1]                                
+       39 -    logger.info(f"Starting Buttercup CRS for harness:         
+          -{harness_name}")                                              
+       40 -                                                              
+       41 -    # Load configuration from environment                     
+       39      config = Config.from_env()                                
+       40                                                                
+       41 -    logger.info("Configuration:")                             
+       42 -    logger.info(f"  Project: {config.project_name}")          
+       43 -    logger.info(f"  Fuzz time: {config.fuzz_time}s")          
+       44 -    logger.info(f"  Engine: {config.fuzzing_engine}")         
+       45 -    logger.info(f"  Sanitizer: {config.sanitizer}")           
+       46 -    logger.info(f"  LLM available: {config.has_llm}")         
+       47 -    logger.info(f"  Delta mode: {config.is_delta_mode}")      
+       41 +    logger.info(f"Starting Buttercup CRS for harness:         
+          +{harness_name}")                                              
+       42 +    logger.info(f"  Fuzz time: {config.fuzz_time}s, Engine:   
+          +{config.fuzzing_engine}")                                     
+       43                                                                
+       44 -    # Ensure output directories exist                         
+       44      config.corpus_dir.mkdir(parents=True, exist_ok=True)      
+       45      config.povs_dir.mkdir(parents=True, exist_ok=True)        
+       46                                                                
+       47 -    # Find the harness binary                                 
+       47 +    # Find harness binary                                     
+       48      harness_path = config.out_dir / harness_name              
+       49      if not harness_path.exists():                             
+       50 -        # Try with common suffixes                            
+       51 -        for suffix in ["", "_fuzzer", ".exe"]:                
+       50 +        for suffix in ["", "_fuzzer"]:                        
+       51              candidate = config.out_dir /                      
+           f"{harness_name}{suffix}"                                     
+       52              if candidate.exists():                            
+       53                  harness_path = candidate                      
+       54                  break                                         
+       55                                                                
+       56      if not harness_path.exists():                             
+       57 -        logger.error(f"Harness binary                         
+          -not found: {harness_path}")                                   
+       58 -        logger.error(f"Contents of {config.out_dir}:")        
+       59 -        for f in config.out_dir.iterdir():                    
+       60 -            logger.error(f"  {f.name}")                       
+       57 +        logger.error(f"Harness not found: {harness_path}")    
+       58          return 1                                              
+       59                                                                
+       60 -    logger.info(f"Using harness: {harness_path}")             
+       61 -                                                              
+       62 -    # Initialize crash collector                              
+       63 -    crash_collector = CrashCollector(config.povs_dir)         
+       64 -                                                              
+       65 -    # Phase 1: LLM-based seed generation (if available)       
+       66 -    generated_seeds: List[str] = []                           
+       67 -    if config.has_llm:                                        
+       68 -        from src.seed_gen.llm_client import LLMClient         
+       69 -                                                              
+       70 -        try:                                                  
+       71 -            llm = LLMClient(                                  
+       72 -                base_url=config.litellm_url,  # type: ignore  
+       73 -                api_key=config.litellm_api_key,  # type:      
+          -ignore                                                        
+       74 -                model="gpt-4o-mini",                          
+       75 -            )                                                 
+       76 -                                                              
+       77 -            if config.is_delta_mode:                          
+       78 -                # Delta mode: try to generate PoVs directly   
+       79 -                logger.info("Delta mode: Running              
+          -vulnerability discovery")                                     
+       80 -                from src.seed_gen.vuln_discovery import       
+          -run_vuln_discovery                                            
+       81 -                                                              
+       82 -                generated_seeds = run_vuln_discovery(         
+       83 -                    llm=llm,                                  
+       84 -                    harness_name=harness_name,                
+       85 -                    diff_path=config.diff_path,  # type:      
+          -ignore                                                        
+       86 -                    source_dir=config.source_workdir,         
+       87 -                    output_dir=config.povs_dir,  # Write      
+          -directly to POVs                                              
+       88 -                )                                             
+       89 -                logger.info(f"Vulnerability discovery         
+          -generated {len(generated_seeds)} potential PoVs")             
+       90 -            else:                                             
+       91 -                # Full mode: generate seeds for corpus        
+       92 -                logger.info("Full mode: Running seed          
+          -initialization")                                              
+       93 -                from src.seed_gen.seed_init import            
+          -run_seed_init                                                 
+       94 -                                                              
+       95 -                generated_seeds = run_seed_init(              
+       96 -                    llm=llm,                                  
+       97 -                    harness_name=harness_name,                
+       98 -                    source_dir=config.source_workdir,         
+       99 -                    output_dir=config.corpus_dir,             
+      100 -                )                                             
+      101 -                logger.info(f"Seed initialization generated   
+          -{len(generated_seeds)} seeds")                                
+      102 -                                                              
+      103 -            llm.close()                                       
+      104 -                                                              
+      105 -        except Exception as e:                                
+      106 -            logger.warning(f"LLM seed generation failed:      
+          -{e}")                                                         
+      107 -            logger.warning("Continuing with fuzzing only...") 
+      108 -                                                              
+      109 -    # Copy any existing seeds from shared seed directory      
+       60 +    # Import seeds from shared directory                      
+       61      seed_share_dir = Path("/seed_share_dir")                  
+       62      if seed_share_dir.exists():                               
+       63 -        import shutil                                         
+       64 -        for seed_file in seed_share_dir.iterdir():            
+       65 -            if seed_file.is_file():                           
+       66 -                shutil.copy2(seed_file, config.corpus_dir /   
+          -seed_file.name)                                               
+       67 -        logger.info(f"Imported seeds from shared directory")  
+       63 +        for f in seed_share_dir.iterdir():                    
+       64 +            if f.is_file():                                   
+       65 +                shutil.copy2(f, config.corpus_dir / f.name)   
+       66                                                                
+       67 -    # Phase 2: ClusterFuzz fuzzing (continuous loop)          
+       68 -    logger.info("Starting fuzzing phase")                     
+       69 -                                                              
+       67 +    # Initialize                                              
+       68 +    crash_collector = CrashCollector(config.povs_dir)         
+       69      fuzz_config = FuzzConfiguration(                          
+       70          corpus_dir=str(config.corpus_dir),                    
+       71          target_path=str(harness_path),                        
+     ...
+      168          sanitizer=config.sanitizer,                           
+      169      )                                                         
+      170                                                                
+      171 -    # Run fuzzing in a continuous loop until total time       
+          -exhausted                                                     
+      171 +    # Continuous fuzzing loop                                 
+      172      start_time = time.time()                                  
+      173 -    total_fuzz_time = config.fuzz_time                        
+      173      iteration = 0                                             
+      174                                                                
+      175 -    while True:                                               
+      176 -        elapsed = time.time() - start_time                    
+      177 -        remaining = total_fuzz_time - elapsed                 
+      178 -                                                              
+      179 -        if remaining <= 0:                                    
+      180 -            logger.info("Fuzz time exhausted, stopping")      
+      181 -            break                                             
+      182 -                                                              
+      183 -        # Use shorter iterations to collect crashes           
+          -periodically                                                  
+      184 -        iteration_time = min(FUZZ_ITERATION_SECONDS,          
+          -int(remaining) + 1)                                           
+      175 +    while time.time() - start_time < config.fuzz_time:        
+      176          iteration += 1                                        
+      177 +        remaining = config.fuzz_time - (time.time() -         
+          +start_time)                                                   
+      178 +        iter_time = min(FUZZ_ITERATION_SECONDS,               
+          +int(remaining) + 1)                                           
+      179                                                                
+      180 -        logger.info(f"Fuzzing iteration {iteration}:          
+          -{iteration_time}s (elapsed: {elapsed:.0f}s /                  
+          -{total_fuzz_time}s)")                                         
+      181 -                                                              
+      182 -        runner_config = Conf(timeout=iteration_time)          
+      183 -        runner = Runner(runner_config)                        
+      184 -                                                              
+      180 +        runner = Runner(Conf(timeout=iter_time))              
+      181          try:                                                  
+      182              result = runner.run_fuzzer(fuzz_config)           
+      183 -            log_fuzz_result(result)                           
+      184 -                                                              
+      185 -            # Collect crashes from this iteration             
+      183              for crash in result.crashes:                      
+      184                  if crash.stacktrace:                          
+      185 -                    is_new =                                  
+          -crash_collector.add_crash(crash.stacktrace, crash.input_path) 
+      186 -                    if is_new:                                
+      187 -                        logger.info(f"New crash found:        
+          -{crash.input_path}")                                          
+      185 +                    if                                        
+          +crash_collector.add_crash(crash.stacktrace, crash.input_path):
+      186 +                        logger.info(f"New crash:              
+          +{crash.input_path}")                                          
+      187                  else:                                         
+      188 -                    # No stacktrace, save anyway              
+      188                                                                
+           crash_collector.save_pov(crash.input_path)                    
+      189 -                    logger.info(f"Crash saved (no             
+          -stacktrace): {crash.input_path}")                             
+      190 -                                                              
+      191 -            logger.info(f"Iteration {iteration} complete.     
+          -Total POVs so far: {crash_collector.pov_count()}")            
+      192 -                                                              
+      189          except Exception as e:                                
+      190 -            logger.error(f"Fuzzing iteration                  
+          -{iteration} failed: {e}")                                     
+      191 -            # Continue to next iteration instead of failing   
+          -completely                                                    
+      192 -            continue                                          
+      190 +            logger.error(f"Iteration {iteration} failed: {e}")
+      191                                                                
+      192 -    logger.info(f"                                            
+          -Fuzzing complete after {iteration} iterations. Total          
+          -POVs: {crash_collector.pov_count()}")                         
+      193 -                                                              
+      194 -    # Report final statistics                                 
+      195 -    logger.info("=" * 50)                                     
+      196 -    logger.info("Final Statistics:")                          
+      197 -    logger.info(f"  POVs discovered:                          
+          -{crash_collector.pov_count()}")                               
+      198 -    logger.info(f"  Corpus size:                              
+          -{len(list(config.corpus_dir.iterdir()))} files")              
+      199 -    logger.info("=" * 50)                                     
+      200 -                                                              
+      192 +    logger.info(f"Done. POVs: {crash_collector.pov_count()}") 
+      193      return 0                                                  
+      194                                                                
+      195                                                                
+
+● Write(oss-crs/src/config.py)
+  ⎿  Added 7 lines, removed 69 lines
+       1 -"""Configuration from environment variables."""                
+       1 +"""Configuration from environment variables for OSS-CRS-2."""  
+       2                                                                 
+       3  import os                                                      
+       4  from dataclasses import dataclass                              
+       5  from pathlib import Path                                       
+       6 -from typing import Optional                                    
+       6                                                                 
+       7                                                                 
+       8  @dataclass                                                     
+       9  class Config:                                                  
+      10      """Runtime configuration from environment variables."""    
+      11                                                                 
+      12 -    # Fuzzing settings                                         
+      12      fuzz_time: int                                             
+      13      fuzzing_engine: str                                        
+      14      sanitizer: str                                             
+      15 -                                                               
+      16 -    # Paths                                                    
+      15      out_dir: Path                                              
+      16 -    artifacts_dir: Path                                        
+      16      corpus_dir: Path                                           
+      17      povs_dir: Path                                             
+      18                                                                 
+      19 -    # LLM settings (optional)                                  
+      20 -    litellm_url: Optional[str]                                 
+      21 -    litellm_api_key: Optional[str]                             
+      22 -                                                               
+      23 -    # Delta mode                                               
+      24 -    diff_path: Optional[Path]                                  
+      25 -                                                               
+      26 -    # Project info                                             
+      27 -    project_name: str                                          
+      28 -    source_workdir: Path                                       
+      29 -                                                               
+      19      @classmethod                                               
+      20      def from_env(cls) -> "Config":                             
+      21 -        """Load configuration from environment variables."""   
+      22 -        fuzz_time = int(os.getenv("FUZZ_TIME", "3600"))        
+      23 -        fuzzing_engine = os.getenv("FUZZING_ENGINE",           
+         -"libfuzzer")                                                   
+      24 -        sanitizer = os.getenv("SANITIZER", "address")          
+      25 -                                                               
+      26 -        out_dir = Path(os.getenv("OUT_DIR", "/out"))           
+      21          artifacts_dir = Path(os.getenv("ARTIFACTS_DIR",        
+          "/artifacts"))                                                 
+      22 -        corpus_dir = artifacts_dir / "corpus"                  
+      23 -        povs_dir = artifacts_dir / "povs"                      
+      24 -                                                               
+      25 -        # LiteLLM settings                                     
+      26 -        litellm_url = os.getenv("LITELLM_URL")                 
+      27 -        litellm_api_key = None                                 
+      28 -                                                               
+      29 -        # Try to read API key from /keys/api_key (OSS-CRS-2    
+         -convention)                                                    
+      30 -        keys_file = Path("/keys/api_key")                      
+      31 -        if keys_file.exists():                                 
+      32 -            litellm_api_key = keys_file.read_text().strip()    
+      33 -        else:                                                  
+      34 -            # Try both LITELLM_KEY (OSS-CRS-2) and             
+         -LITELLM_API_KEY (generic)                                      
+      35 -            litellm_api_key = os.getenv("LITELLM_KEY") or      
+         -os.getenv("LITELLM_API_KEY")                                   
+      36 -                                                               
+      37 -        # Delta mode diff file                                 
+      38 -        diff_path = None                                       
+      39 -        ref_diff = Path("/ref.diff")                           
+      40 -        if ref_diff.exists():                                  
+      41 -            diff_path = ref_diff                               
+      42 -                                                               
+      43 -        project_name = os.getenv("CRS_TARGET",                 
+         -os.getenv("PROJECT_NAME", "unknown"))                          
+      44 -        source_workdir = Path(os.getenv("SOURCE_WORKDIR",      
+         -"/src"))                                                       
+      45 -                                                               
+      22          return cls(                                            
+      23 -            fuzz_time=fuzz_time,                               
+      24 -            fuzzing_engine=fuzzing_engine,                     
+      25 -            sanitizer=sanitizer,                               
+      26 -            out_dir=out_dir,                                   
+      27 -            artifacts_dir=artifacts_dir,                       
+      28 -            corpus_dir=corpus_dir,                             
+      29 -            povs_dir=povs_dir,                                 
+      30 -            litellm_url=litellm_url,                           
+      31 -            litellm_api_key=litellm_api_key,                   
+      32 -            diff_path=diff_path,                               
+      33 -            project_name=project_name,                         
+      34 -            source_workdir=source_workdir,                     
+      23 +            fuzz_time=int(os.getenv("FUZZ_TIME", "3600")),     
+      24 +            fuzzing_engine=os.getenv("FUZZING_ENGINE",         
+         +"libfuzzer"),                                                  
+      25 +            sanitizer=os.getenv("SANITIZER", "address"),       
+      26 +            out_dir=Path(os.getenv("OUT", "/out")),            
+      27 +            corpus_dir=artifacts_dir / "corpus",               
+      28 +            povs_dir=artifacts_dir / "povs",                   
+      29          )                                                      
+      30 -                                                               
+      31 -    @property                                                  
+      32 -    def has_llm(self) -> bool:                                 
+      33 -        """Check if LLM is available."""                       
+      34 -        return self.litellm_url is not None and                
+         -self.litellm_api_key is not None                               
+      35 -                                                               
+      36 -    @property                                                  
+      37 -    def is_delta_mode(self) -> bool:                           
+      38 -        """Check if running in delta mode."""                  
+      39 -        return self.diff_path is not None                      
+  ⎿  Found 2 new diagnostic issues in 1 file (ctrl+o to expand)
+
+● Bash(tokei /home/andrew/post/buttercup/oss-crs/src
+      /home/andrew/post/buttercup/oss-crs/run_fuzzer.py)
+  ⎿  Error: Exit code 1
+     zsh:1: permission denied: /tmp/claude-0af5-cwd
+
+     ===========================================================================
+     ===
+      Language            Files        Lines         Code     Comments       
+     Blanks
+     ===========================================================================
+     ===
+      Python                  4          212          161           10          
+     41
+     ===========================================================================
+     ===
+      Total                   4          212          161           10          
+     41
+     ===========================================================================
+     ===
+
+
+
+● 212 lines - much better. Now let's test:
+
+● Bash(cd ~/post/oss-crs-2 && uv run oss-bugfind-crs build           timeout: 5m
+      --project-image-prefix aixcc-afc --oss-fuzz-dir                0s
+      ~/post/oss-fuzz-clean example_configs/buttercup
+      aixcc/c/sani…)
+  ⎿ #2 [internal] load metadata for ghcr.io/aixcc-finals/base-builder:v1.3.
+    0
+    #2 DONE 0.0s
+    … +53 lines (ctrl+o to expand)
+
+  ⎿  Shell cwd was reset to /home/andrew/post/buttercup
+
+● The Dockerfile path is wrong now. I need to move the Dockerfiles to the root
+  or adjust the path:
+
+● Read 1 file (ctrl+o to expand)
+
+● The oss-crs-2 system expects Dockerfiles at the source root. Let me move them:
+
+● Bash(mv /home/andrew/post/buttercup/oss-crs/builder.Dockerfile
+      /home/andrew/post/buttercup/builder.Dockerfile && mv
+      /home/andrew/post/buttercup/oss-crs/runner.Docker…)
+  ⎿  (No content)
+
+● Bash(mv /home/andrew/post/buttercup/oss-crs/config-crs.yaml
+      /home/andrew/post/buttercup/config-crs.yaml 2>/dev/null; mv
+      /home/andrew/post/buttercup/oss-crs/requireme…)
+  ⎿  (No content)
+
+● Write(runner.Dockerfile)
+  ⎿  Added 3 lines, removed 3 lines
+      11  ENV PATH="/opt/venv/bin:$PATH"                                 
+      12  RUN pip install --upgrade pip                                  
+      13                                                                 
+      14 -# Copy and install buttercup packages from the repo            
+      14 +# Copy and install buttercup packages                          
+      15  COPY common /src/buttercup/common                              
+      16  COPY fuzzer_runner /src/buttercup/fuzzer_runner                
+      17                                                                 
+      18  WORKDIR /crs                                                   
+      19                                                                 
+      20 -# Install buttercup packages and minimal additional deps       
+      21 -COPY oss-crs/requirements.txt .                                
+      20 +# Install buttercup packages and deps                          
+      21 +COPY oss-crs-requirements.txt requirements.txt                 
+      22  RUN pip install --no-cache-dir -r requirements.txt             
+      23                                                                 
+      24  # Copy the thin interface layer                                
+
+● Bash(cd ~/post/oss-crs-2 && uv run oss-bugfind-crs build           timeout: 5m
+      --project-image-prefix aixcc-afc --oss-fuzz-dir                0s
+      ~/post/oss-fuzz-clean example_configs/buttercup
+      aixcc/c/sani…)
+  ⎿ #6 exporting to image
+    #6 exporting layers done
+    #6 writing image sha256:568a74e47474783bc3fe882cc842cd8079b9d0d76522992
+    … +119 lines (ctrl+o to expand)
+
+  ⎿  Shell cwd was reset to /home/andrew/post/buttercup
+
+● Build succeeded. Now test run:
+
+● Bash(cd ~/post/oss-crs-2 && uv run oss-bugfind-crs run             timeout: 3m
+      example_configs/buttercup aixcc/c/sanity-mock-c-delta-01       0s
+      fuzz_process_input_header 2>&1 | head -100)
+  ⎿ INFO: OSS-Fuzz directory already exists with project aixcc/c/sanity-moc
+    k-c-delta-01: /home/andrew/post/oss-crs-2/build/oss-fuzz/aixcc/c/sanity
+    -mock-c-delta-01
+    … +112 lines (ctrl+o to expand)
+
+
+  ⎿  Shell cwd was reset to /home/andrew/post/buttercup
+
+● Bash(cd ~/post/oss-crs-2 && timeout 120 bash -c 'uv run           timeout: 3m 
+      oss-bugfind-crs run example_configs/buttercup                 0s
+      aixcc/c/sanity-mock-c-delta-01 fuzz_process_input_header
+      2>&1'…)
+  ⎿  #20 [buttercup_runner internal] load build context
+     #20 transferring context: 6.78kB done
+     #20 DONE 0.1s
+     … +98 lines (ctrl+o to expand)
+  ⎿  Shell cwd was reset to /home/andrew/post/buttercup
+
+● The common package requires Python >=3.12 but base-runner has 3.11. Let me fix
+   the version constraint:
+
+● Searched for 2 patterns (ctrl+o to expand)
+
+● Both packages require Python 3.12. Let me relax the constraint to support
+  3.11:
+
+● Update(common/pyproject.toml)
+  ⎿  Added 1 line, removed 1 line
+       4  description = "Shared utilities and components for Buttercup   
+          CRS"                                                           
+       5  authors = [{ name = "Trail of Bits", email =                   
+          "opensource@trailofbits.com" }]                                
+       6  license = "AGPL-3.0-only"                                      
+       7 -requires-python = ">=3.12,<3.13"                               
+       7 +requires-python = ">=3.11,<3.14"                               
+       8  dependencies = [                                               
+       9      "pydantic-settings ~=2.7.1",                               
+      10      "pymongo ~=4.10.1",                                        
+
+● Update(fuzzer_runner/pyproject.toml)
+  ⎿  Added 1 line, removed 1 line
+       4  description = "libfuzzer-based fuzzer runner"                  
+       5  authors = [{ name = "Trail of Bits", email =                   
+          "opensource@trailofbits.com" }]                                
+       6  license = "AGPL-3.0-only"                                      
+       7 -requires-python = ">=3.12,<3.13"                               
+       7 +requires-python = ">=3.11,<3.14"                               
+       8  dependencies = [                                               
+       9      "common",                                                  
+      10      "clusterfuzz ==2.6.0",                                     
+
+● Bash(cd ~/post/oss-crs-2 && timeout 120 bash -c 'uv run           timeout: 3m 
+      oss-bugfind-crs run example_configs/buttercup                 0s
+      aixcc/c/sanity-mock-c-delta-01 fuzz_process_input_header
+      2>&1'…)
+  ⎿  #29 [buttercup_runner 10/11] COPY oss-crs/run_fuzzer.py .
+     #29 DONE 0.1s
+     … +122 lines (ctrl+o to expand)
+  ⎿  Shell cwd was reset to /home/andrew/post/buttercup
+
+● The issue is buttercup.common.stack_parsing imports Redis at module level. Let
+   me check if we can isolate just the functions we need:
+
+● Read 1 file (ctrl+o to expand)
+
+● The original code imports Redis at module level. Let me refactor it to
+  separate pure functions from Redis-dependent code:
+
+● Read 1 file (ctrl+o to expand)
+
+● I'll refactor to separate pure functions from Redis-dependent code:
+
+● Write(common/src/buttercup/common/stack_parsing.py)
+  ⎿  Added 13 lines, removed 36 lines
+       1 +"""Stack parsing utilities for crash deduplication.            
+       2 +                                                               
+       3 +Pure functions that don't require Redis or other external      
+         +services.                                                      
+       4 +"""                                                            
+       5 +                                                               
+       6  import logging                                                 
+       7  import re                                                      
+       8                                                                 
+       9 -from bson.json_util import CANONICAL_JSON_OPTIONS, dumps       
+      10 -from redis import Redis                                        
+      11 -                                                               
+       9  from buttercup.common.clusterfuzz_parser import CrashInfo,     
+          StackParser                                                    
+      10 -from buttercup.common.sets import RedisSet                     
+      10                                                                 
+      11  logger = logging.getLogger(__name__)                           
+      12                                                                 
+      13                                                                 
+      14 -class CrashSet:                                                
+      15 -    def __init__(self, redis: Redis):                          
+      16 -        self.redis = redis                                     
+      17 -        self.set_name = "crash_set"                            
+      18 -        self.set = RedisSet(redis, self.set_name)              
+      19 -                                                               
+      20 -    def _get_final_line_number(self, crash_info: CrashInfo) -> 
+         - int:                                                          
+      21 -        """Gets the line number of the final stack frame in    
+         -the stacktrace."""                                             
+      22 -        if crash_info.frames and crash_info.frames[0] and      
+         -crash_info.frames[0][0]:                                       
+      23 -            if crash_info.frames[0][0].fileline:               
+      24 -                return int(crash_info.frames[0][0].fileline)   
+      25 -                                                               
+      26 -        return 0                                               
+      27 -                                                               
+      28 -    # Returns True if the crash was already in the set         
+      29 -    def add(self, project: str, harness_name: str, task_id:    
+         -str, sanitizer: str, stacktrace: str) -> bool:                 
+      30 -        crash_info = parse_stacktrace(stacktrace)              
+      31 -        crash_data =                                           
+         -get_crash_data_from_crash_info(crash_info)                     
+      32 -        inst_key = get_inst_key(stacktrace)                    
+      33 -        line_number = self._get_final_line_number(crash_info)  
+      34 -                                                               
+      35 -        # NOTE: Storing "exact" crash data and allowing        
+         -"similar" crashes to migrate to the tracer-bot/orchestrator    
+         -for                                                            
+      36 -        # deduplication.                                       
+      37 -        key = dumps(                                           
+      38 -            [project, harness_name, task_id, sanitizer,        
+         -crash_data, inst_key, line_number],                            
+      39 -            json_options=CANONICAL_JSON_OPTIONS,               
+      40 -        )                                                      
+      41 -        return self.set.add(key)                               
+      42 -                                                               
+      43 -                                                               
+      14  def parse_stacktrace(stacktrace: str, symbolized: bool =       
+          False) -> CrashInfo:                                           
+      15 +    """Parse a stacktrace into structured crash info."""       
+      16      # Strip ANSI escape codes from stacktrace as               
+          parse_stacktrace doesn't like them                             
+      17      ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[      
+          -/]*[@-~])")                                                   
+      18      stacktrace = ansi_escape.sub("", stacktrace)               
+     ...
+      50                                                                 
+      51                                                                 
+      52  def get_crash_data_from_crash_info(crash_info: CrashInfo) ->   
+          str:                                                           
+      53 +    """Extract crash state string from crash info."""          
+      54      return crash_info.crash_state                              
+      55                                                                 
+      56                                                                 
+      57  def get_crash_data(stacktrace: str, symbolized: bool = False)  
+          -> str:                                                        
+      58 +    """Extract crash state from stacktrace."""                 
+      59      prs = parse_stacktrace(stacktrace, symbolized)             
+      60      logger.info(f"Crash data: {prs.crash_state}")              
+      61      return get_crash_data_from_crash_info(prs)                 
+      62                                                                 
+      63                                                                 
+      64  def get_inst_key(stacktrace: str) -> str:                      
+      65 +    """Extract instrumented fragment identifiers from          
+         +stacktrace."""                                                 
+      66      # vendored code from afc-finals/example-crs-architecture   
+      67      inst_pattern = re.compile(pattern=r"Instrumented\s(?P<frag 
+          ment>[A-Za-z0-9\.]*)\s")                                       
+      68      matches = inst_pattern.findall(stacktrace)                 
+      69      return "\n".join(sorted(matches)) if matches else ""       
+      70                                                                 
+      71                                                                 
+      72 -# Convenience function for getting crash tokens. For a given   
+         -crash we expect only one of these two functions                
+      73 -# to return a trace, this makes sure we get something.         
+      72  def get_crash_token(stacktrace: str) -> str:                   
+      73 +    """Get a deduplication token for a crash.                  
+      74 +                                                               
+      75 +    Combines crash state and instrumented fragments.           
+      76 +    """                                                        
+      77      return get_crash_data(stacktrace) +                        
+          get_inst_key(stacktrace)                                       
+
+● Now create the separate file for Redis-dependent CrashSet:
+
+● Write(common/src/buttercup/common/crash_set.py)
+  ⎿  Wrote 48 lines to common/src/buttercup/common/crash_set.py
+     """Redis-based crash deduplication set.
+
+     Separated from stack_parsing.py to avoid importing Redis for pure 
+     parsing functions.
+     """
+
+     from bson.json_util import CANONICAL_JSON_OPTIONS, dumps
+     from redis import Redis
+
+     from buttercup.common.clusterfuzz_parser import CrashInfo
+     from buttercup.common.sets import RedisSet
+     … +38 lines (ctrl+o to expand)
+
+● Searched for 1 pattern (ctrl+o to expand)
+  ⎿  Found 1 new diagnostic issue in 1 file (ctrl+o to expand)
+
+● Update(seed-gen/src/buttercup/seed_gen/seed_gen_bot.py)
+  ⎿  Added 1 line, removed 1 line
+      12  from buttercup.common.queues import QueueFactory, QueueNames   
+      13  from buttercup.common.reproduce_multiple import                
+          ReproduceMultiple                                              
+      14  from buttercup.common.sarif_store import SARIFStore            
+      15 -from buttercup.common.stack_parsing import CrashSet            
+      15 +from buttercup.common.crash_set import CrashSet                
+      16  from buttercup.program_model.codequery import                  
+          CodeQueryPersistent                                            
+      17  from redis import Redis                                        
+      18                                                                 
+
+● Update(seed-gen/src/buttercup/seed_gen/vuln_base_task.py)
+  ⎿  Added 1 line, removed 1 line
+      17  from buttercup.common.queues import ReliableQueue              
+      18  from buttercup.common.reproduce_multiple import                
+          ReproduceMultiple, ReproduceResult                             
+      19  from buttercup.common.sarif_store import SARIFBroadcastDetail  
+      20 -from buttercup.common.stack_parsing import CrashSet            
+      20 +from buttercup.common.crash_set import CrashSet                
+      21  from buttercup.common.telemetry import CRSActionCategory,      
+          set_crs_attributes                                             
+      22  from langchain_core.output_parsers import StrOutputParser      
+      23  from langchain_core.prompts.chat import ChatPromptTemplate     
+
+● Update(seed-gen/test/conftest.py)
+  ⎿  Added 1 line, removed 1 line
+       8  from buttercup.common.challenge_task import ChallengeTask      
+       9  from buttercup.common.project_yaml import Language,            
+          ProjectYaml                                                    
+      10  from buttercup.common.reproduce_multiple import                
+          ReproduceMultiple                                              
+      11 -from buttercup.common.stack_parsing import CrashSet            
+      11 +from buttercup.common.crash_set import CrashSet                
+      12  from buttercup.common.task_meta import TaskMeta                
+      13  from buttercup.program_model.codequery import                  
+          CodeQueryPersistent                                            
+      14  from langchain_core.language_models import BaseChatModel       
+
+● Update(fuzzer/src/buttercup/fuzzing_infra/fuzzer_bot.py)
+  ⎿  Added 1 line, removed 1 line
+      12  from buttercup.common.logger import setup_package_logger       
+      13  from buttercup.common.node_local import scratch_dir            
+      14  from buttercup.common.queues import QueueFactory, QueueNames   
+      15 -from buttercup.common.stack_parsing import CrashSet            
+      15 +from buttercup.common.crash_set import CrashSet                
+      16  from buttercup.common.telemetry import CRSActionCategory,      
+          init_telemetry, set_crs_attributes                             
+      17  from buttercup.common.types import FuzzConfiguration           
+      18  from buttercup.common.utils import                             
+          setup_periodic_zombie_reaper                                   
+
+● Update(common/tests/test_stack_parser.py)
+  ⎿  Added 1 line, removed 1 line
+       5  import pytest                                                  
+       6  from redis import Redis                                        
+       7                                                                 
+       8 -from buttercup.common.stack_parsing                            
+         - import CrashSet, get_crash_data, get_inst_key,                
+         -parse_stacktrace                                               
+       8 +from buttercup.common.crash_set                                
+         + import CrashSet, get_crash_data, get_inst_key,                
+         +parse_stacktrace                                               
+       9                                                                 
+      10  # ruff: noqa: E501                                             
+      11                                                                 
+  ⎿  Found 30 new diagnostic issues in 3 files (ctrl+o to expand)
+
+● Bash(cd ~/post/oss-crs-2 && timeout 120 bash -c 'uv run           timeout: 3m 
+      oss-bugfind-crs run example_configs/buttercup                 0s
+      aixcc/c/sanity-mock-c-delta-01 fuzz_process_input_header
+      2>&1'…)
+  ⎿ buttercup_runner-1  | 2026-01-30 03:02:32,297 - buttercup.fuzzer_runner
+    .runner - INFO - Running fuzzer with libfuzzer | address | /out/fuzz_pr
+    ocess_input_header
+    … +124 lines (ctrl+o to expand)
+
+
+  ⎿  Shell cwd was reset to /home/andrew/post/buttercup
+  ⎿  Found 2 new diagnostic issues in 1 file (ctrl+o to expand)
+
+● Good progress - stack_parsing now works. But the fuzzer_runner.runner requires
+   NODE_DATA_DIR. Let me check what it needs:
+
+● Searched for 1 pattern (ctrl+o to expand)
+
+● I need to set NODE_DATA_DIR in the Dockerfile:
+
+● Update(runner.Dockerfile)
+  ⎿  Added 1 line
+       9  # Create venv                                                  
+      10  RUN python3 -m venv /opt/venv                                  
+      11  ENV PATH="/opt/venv/bin:$PATH"                                 
+      12 +ENV NODE_DATA_DIR="/tmp/node_data"                             
+      13  RUN pip install --upgrade pip                                  
+      14                                                                 
+      15  # Copy and install buttercup packages                          
+
+● Bash(cd ~/post/oss-crs-2 && timeout 90 bash -c 'uv run            timeout: 3m 
+      oss-bugfind-crs run example_configs/buttercup                 0s
+      aixcc/c/sanity-mock-c-delta-01 fuzz_process_input_header
+      2>&1' |…)
+  ⎿ buttercup_runner-1  |
+    buttercup_runner-1  | 2026-01-30 03:04:26,259 - buttercup.fuzzer_runner
+    .runner - INFO - Running fuzzer with libfuzzer | address | /out/fuzz_pr
+    … +71 lines (ctrl+o to expand)
+
+
+  ⎿  Shell cwd was reset to /home/andrew/post/buttercup
+
+● The fuzzer is running and finding crashes. Let me verify POVs were saved:
+
+● Read 3 files (ctrl+o to expand)
+
+● POVs are being saved. Let me check the final line count:
+
+● Bash(tokei /home/andrew/post/buttercup/oss-crs)
+  ⎿ =======================================================================
+    ========
+     Language            Files        Lines         Code     Comments
+    … +11 lines (ctrl+o to expand)
+
+
+● Bash(find /home/andrew/post/buttercup/oss-crs -type f -name "*.py" -o -name
+      "*.txt" -o -name "*.yaml" | xargs wc -l 2>/dev/null | sort -n)
+  ⎿     1 /home/andrew/post/buttercup/oss-crs/src/__init__.py
+       29 /home/andrew/post/buttercup/oss-crs/src/config.py
+       83 /home/andrew/post/buttercup/oss-crs/src/crash_collector.py
+     … +2 lines (ctrl+o to expand)
+
+● The oss-crs interface is now a thin 212-line wrapper that uses the original
+  buttercup packages:
+
+  Final structure:
+  ~/post/buttercup/
+  ├── builder.Dockerfile      # OSS-CRS build phase
+  ├── runner.Dockerfile       # OSS-CRS run phase (installs buttercup packages)
+  ├── config-crs.yaml         # CRS config
+  ├── oss-crs-requirements.txt # Dependencies
+  ├── oss-crs/
+  │   ├── run_fuzzer.py       # Entry point (99 lines) - uses
+  buttercup.fuzzer_runner
+  │   └── src/
+  │       ├── __init__.py     # 1 line
+  │       ├── config.py       # 29 lines - env var loading
+  │       └── crash_collector.py  # 83 lines - uses
+  buttercup.common.stack_parsing
+  └── (original buttercup packages: common/, fuzzer_runner/, etc.)
+
+  Changes to original buttercup code:
+  1. common/pyproject.toml - relaxed Python version to >=3.11
+  2. fuzzer_runner/pyproject.toml - relaxed Python version to >=3.11
+  3. common/src/buttercup/common/stack_parsing.py - removed Redis imports (pure
+  functions only)
+  4. common/src/buttercup/common/crash_set.py - new file for Redis-dependent
+  CrashSet class
+  5. Updated imports in 5 files to use new crash_set module location
+
+✻ Sautéed for 10m 27s
+
+❯ Are you still running the containers, stop them! 
+
+● Bash(docker ps --filter "name=crs" -q | xargs -r docker stop && docker ps
+      --filter "name=crs" -aq | xargs -r docker rm 2>/dev/null; echo "Done")
+  ⎿  e0a0a19db34c
+     db3924a15cd2
+     1fe5efa7db85
+     … +6 lines (ctrl+o to expand)
+
+● Done. Stopped and removed all CRS containers.

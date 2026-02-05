@@ -17,7 +17,7 @@ from buttercup.common.project_yaml import Language
 from buttercup.common.queues import ReliableQueue
 from buttercup.common.reproduce_multiple import ReproduceMultiple, ReproduceResult
 from buttercup.common.sarif_store import SARIFBroadcastDetail
-from buttercup.common.stack_parsing import CrashSet
+from buttercup.common.crash_set import CrashSet
 from buttercup.common.telemetry import CRSActionCategory, set_crs_attributes
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts.chat import ChatPromptTemplate

@@ -32,7 +32,7 @@ class ButtercupLLM(Enum):
     OPENAI_GPT_4_1 = "openai-gpt-4.1"
     CLAUDE_3_7_SONNET = "claude-3.7-sonnet"
     CLAUDE_4_SONNET = "claude-4-sonnet"
-    CLAUDE_4_5_SONNET = "claude-4.5-sonnet"
+    CLAUDE_4_5_SONNET = "claude-sonnet-4-5-20250929"
     GEMINI_PRO = "gemini-pro"
     GEMINI_2_5_FLASH = "gemini-2.5-flash"
     GEMINI_2_5_FLASH_EXP = "gemini-2.5-flash-exp"
