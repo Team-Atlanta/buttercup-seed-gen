@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """OSS-CRS Orchestrator - Populates Redis from disk artifacts.
 
-This one-shot script reads the ChallengeTask-compatible directory structure
-created by the builder phase and registers builds in Redis so that vanilla
-buttercup services (fuzzer-bot, coverage-bot, seed-gen) can pick up tasks.
+This one-shot script reads the pre-built artifacts from the OSS-CRS builder phase
+and registers builds in Redis so that vanilla buttercup services
+(fuzzer-bot, coverage-bot, seed-gen) can pick up tasks.
 
-Expected directory structure (created by builder-default.sh):
+Expected directory structure (created by compile_target):
     /artifacts/task/                   # Task root directory
     /artifacts/task/task_meta.json     # TaskMeta file
     /artifacts/task/src/               # Source code snapshot
-    /artifacts/task/fuzz-tooling/      # OSS-Fuzz tooling
+    /artifacts/task/fuzz-tooling/      # OSS-Fuzz build structure
     /artifacts/task/fuzz-tooling/build/out/{project}/  # Build outputs
 
 Run Phase Architecture:
@@ -29,7 +29,6 @@ Run Phase Architecture:
    bot      bot
 """
 
-import json
 import logging
 import os
 import sys
@@ -37,7 +36,6 @@ from pathlib import Path
 
 from redis import Redis
 
-from buttercup.common.challenge_task import ChallengeTask
 from buttercup.common.clusterfuzz_utils import get_fuzz_targets
 from buttercup.common.datastructures.msg_pb2 import BuildOutput, BuildType, WeightedHarness
 from buttercup.common.maps import BuildMap, HarnessWeights
@@ -50,11 +48,48 @@ logging.basicConfig(
 logger = logging.getLogger("oss-crs-orchestrator")
 
 
+def find_build_directory(task_dir: Path, project_name: str) -> Path | None:
+    """Find the build output directory for fuzz targets.
+
+    Checks multiple locations to handle different directory structures:
+    1. task/fuzz-tooling/oss-fuzz/build/out/{project}/  (ChallengeTask compatible)
+    2. task/fuzz-tooling/build/out/{project}/  (legacy structure)
+    3. task/fuzz-tooling/build/out/  (flat outputs)
+    """
+    # ChallengeTask compatible structure (oss-fuzz subdirectory)
+    build_dir = task_dir / "fuzz-tooling" / "oss-fuzz" / "build" / "out" / project_name
+    if build_dir.exists() and build_dir.is_dir():
+        logger.info(f"Found build directory at {build_dir}")
+        return build_dir
+
+    # Legacy structure without oss-fuzz subdirectory
+    build_dir = task_dir / "fuzz-tooling" / "build" / "out" / project_name
+    if build_dir.exists() and build_dir.is_dir():
+        logger.info(f"Found build directory at {build_dir}")
+        return build_dir
+
+    # Check if fuzz targets exist directly in build/out/
+    for base in ["fuzz-tooling/oss-fuzz/build/out", "fuzz-tooling/build/out"]:
+        build_out = task_dir / base
+        if build_out.exists():
+            # Look for executable files (fuzz targets) directly
+            has_executables = any(
+                f.is_file() and os.access(f, os.X_OK) and not f.name.startswith('.')
+                for f in build_out.iterdir()
+            )
+            if has_executables:
+                logger.info(f"Found fuzz targets directly in {build_out}")
+                return build_out
+
+    return None
+
+
 def main() -> int:
     redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
     task_dir = Path(os.environ.get("TASK_DIR", "/artifacts/task"))
     coverage_dir = Path(os.environ.get("COVERAGE_DIR", "/artifacts/coverage"))
-    harness_filter = os.environ.get("HARNESS_NAME", "")  # If set, only register this harness
+    # Filter to specific harness - check both HARNESS_NAME and OSS_CRS_TARGET_HARNESS
+    harness_filter = os.environ.get("HARNESS_NAME") or os.environ.get("OSS_CRS_TARGET_HARNESS", "")
 
     logger.info(f"Connecting to Redis at {redis_url}")
     redis = Redis.from_url(redis_url)
@@ -71,7 +106,7 @@ def main() -> int:
     task_meta_path = task_dir / "task_meta.json"
     if not task_meta_path.exists():
         logger.error(f"task_meta.json not found at {task_meta_path}")
-        logger.error("Did you run builder-default.sh first?")
+        logger.error("Did you run compile_target first?")
         return 1
 
     # Load task metadata
@@ -87,10 +122,8 @@ def main() -> int:
 
     registered_targets = 0
 
-    # Use ChallengeTask to find the correct build directory
-    # ChallengeTask.get_build_dir() returns fuzz-tooling/{oss-fuzz-subdir}/build/out/{project}
-    challenge_task = ChallengeTask(task_dir)
-    build_dir = challenge_task.get_build_dir()
+    # Find the build directory directly (don't use ChallengeTask)
+    build_dir = find_build_directory(task_dir, package_name)
     logger.info(f"Build directory: {build_dir}")
 
     # Register ASan/Fuzzer build
@@ -98,7 +131,7 @@ def main() -> int:
         logger.info(f"Registering FUZZER build from {task_dir}")
         fuzzer_build = BuildOutput(
             build_type=BuildType.FUZZER,
-            task_dir=str(task_dir),  # ChallengeTask expects the task root, not build dir
+            task_dir=str(task_dir),  # Task root directory
             task_id=task_id,
             engine="libfuzzer",
             sanitizer="address",
@@ -147,12 +180,8 @@ def main() -> int:
         build_map.add_build(coverage_build)
         logger.info("COVERAGE build registered (standalone task)")
     elif coverage_dir.exists() and any(coverage_dir.iterdir()):
-        # Flat coverage directory - need to create a minimal task structure
-        # or use a different approach for coverage builds
+        # Flat coverage directory
         logger.info(f"Coverage artifacts found at {coverage_dir}")
-        logger.info("Note: Coverage builds work best with full task structure")
-        # For now, we can still register it pointing to the flat directory
-        # The coverage bot may need adaptation for this case
         coverage_build = BuildOutput(
             build_type=BuildType.COVERAGE,
             task_dir=str(coverage_dir),
@@ -172,7 +201,7 @@ def main() -> int:
 
     running = True
 
-    def signal_handler(signum, frame):
+    def signal_handler(signum, _frame):
         nonlocal running
         logger.info(f"Received signal {signum}, shutting down...")
         running = False

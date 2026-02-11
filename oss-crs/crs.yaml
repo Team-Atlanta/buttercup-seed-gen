@@ -1,0 +1,62 @@
+name: buttercup
+type:
+  - bug-finding
+version: "1.0.0"
+docker_registry: ghcr.io/trailofbits/buttercup
+
+prepare_phase:
+  hcl: oss-crs/docker-bake.hcl
+
+target_build_phase:
+  - name: build
+    dockerfile: oss-crs/dockerfiles/builder.Dockerfile
+    outputs:
+      - task
+  - name: build-coverage
+    dockerfile: oss-crs/dockerfiles/builder-coverage.Dockerfile
+    outputs:
+      - task-coverage
+  - name: build-codequery
+    dockerfile: oss-crs/dockerfiles/builder-codequery.Dockerfile
+    depends_on:
+      - build
+    outputs:
+      - cqdb
+
+crs_run_phase:
+  redis:
+    dockerfile: oss-crs/dockerfiles/redis.Dockerfile
+  orchestrator:
+    dockerfile: oss-crs/dockerfiles/buttercup-runner.Dockerfile
+    additional_env:
+      RUN_TYPE: orchestrator
+  fuzzer-bot:
+    dockerfile: oss-crs/dockerfiles/buttercup-runner.Dockerfile
+    additional_env:
+      RUN_TYPE: fuzzer
+  coverage-bot:
+    dockerfile: oss-crs/dockerfiles/buttercup-runner.Dockerfile
+    additional_env:
+      RUN_TYPE: coverage
+  seed-gen:
+    dockerfile: oss-crs/dockerfiles/buttercup-runner.Dockerfile
+    additional_env:
+      RUN_TYPE: seedgen
+
+supported_target:
+  mode:
+    - full
+    - delta
+  language:
+    - c
+    - c++
+  sanitizer:
+    - address
+  architecture:
+    - x86_64
+
+# LLMs are optional - uncomment for LLM-powered seed generation
+# required_llms:
+#   - claude-sonnet-4-5-20250929
+#   - gpt-4.1
+#   - gpt-4.1-mini

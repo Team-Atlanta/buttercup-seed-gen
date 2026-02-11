@@ -1,0 +1,95 @@
+#!/bin/bash
+# Buttercup Target Builder
+# Compiles the target using OSS-Fuzz tooling and uploads via libCRS
+
+set -e
+
+# PROJECT may be set by OSS-Fuzz, or PROJECT_NAME may be set by OSS-CRS
+PROJECT="${PROJECT:-$PROJECT_NAME}"
+
+echo "=== Buttercup Target Builder ==="
+echo "Project: $PROJECT"
+echo "Sanitizer: $SANITIZER"
+
+# Run the OSS-Fuzz compile script
+compile
+
+# Create task structure expected by buttercup ChallengeTask
+# The task directory will contain:
+#   task/task_meta.json                                    - Task metadata
+#   task/src/                                              - Source code snapshot
+#   task/fuzz-tooling/oss-fuzz/                           - OSS-Fuzz structure
+#   task/fuzz-tooling/oss-fuzz/infra/helper.py            - Stub for validation
+#   task/fuzz-tooling/oss-fuzz/projects/$PROJECT/Dockerfile - Minimal Dockerfile
+#   task/fuzz-tooling/oss-fuzz/build/out/$PROJECT/        - Build outputs
+
+TASK_DIR="/task_output"
+OSS_FUZZ_DIR="$TASK_DIR/fuzz-tooling/oss-fuzz"
+mkdir -p "$TASK_DIR/src"
+mkdir -p "$OSS_FUZZ_DIR/infra"
+mkdir -p "$OSS_FUZZ_DIR/projects/$PROJECT"
+mkdir -p "$OSS_FUZZ_DIR/build/out/$PROJECT"
+
+# Copy source
+cp -r "$SRC"/* "$TASK_DIR/src/" 2>/dev/null || true
+
+# Copy build outputs
+cp -r "$OUT"/* "$OSS_FUZZ_DIR/build/out/$PROJECT/" 2>/dev/null || true
+
+# Create stub helper.py (required by ChallengeTask validation)
+cat > "$OSS_FUZZ_DIR/infra/helper.py" << 'HELPER_EOF'
+#!/usr/bin/env python3
+"""Stub helper.py for OSS-CRS pre-built fuzzers.
+
+This stub is not used for actual fuzzing - the fuzzers are pre-built
+and run directly via ClusterFuzz-style runner.
+"""
+import sys
+print("OSS-CRS stub helper.py - fuzzers are pre-built", file=sys.stderr)
+sys.exit(1)
+HELPER_EOF
+chmod +x "$OSS_FUZZ_DIR/infra/helper.py"
+
+# Create minimal Dockerfile stub
+cat > "$OSS_FUZZ_DIR/projects/$PROJECT/Dockerfile" << DOCKERFILE_EOF
+# Stub Dockerfile for OSS-CRS pre-built fuzzers
+FROM gcr.io/oss-fuzz-base/base-builder
+WORKDIR /src/$PROJECT
+DOCKERFILE_EOF
+
+# Create project.yaml (required by seed-gen's ProjectYaml class)
+cat > "$OSS_FUZZ_DIR/projects/$PROJECT/project.yaml" << PROJECTYAML_EOF
+# Auto-generated project.yaml for OSS-CRS pre-built fuzzers
+homepage: "https://oss-fuzz.com"
+language: ${FUZZING_LANGUAGE:-c}
+sanitizers:
+  - ${SANITIZER:-address}
+fuzzing_engines:
+  - ${FUZZING_ENGINE:-libfuzzer}
+PROJECTYAML_EOF
+
+# Create task_meta.json
+# Format matches buttercup TaskMeta: project_name, focus, task_id, metadata
+TASK_ID="${OSS_CRS_TARGET:-$PROJECT}_$(date +%s)"
+cat > "$TASK_DIR/task_meta.json" << EOF
+{
+    "task_id": "$TASK_ID",
+    "project_name": "${PROJECT:-$OSS_CRS_TARGET}",
+    "focus": "",
+    "metadata": {
+        "language": "${FUZZING_LANGUAGE:-c}",
+        "sanitizer": "${SANITIZER:-address}",
+        "engine": "${FUZZING_ENGINE:-libfuzzer}",
+        "oss_fuzz_subdir": "."
+    }
+}
+EOF
+
+echo "Task ID: $TASK_ID"
+echo "Task directory structure:"
+find "$TASK_DIR" -type f | head -20
+
+# Submit build output via libCRS
+libCRS submit-build-output "$TASK_DIR" task
+
+echo "=== Build complete ==="

@@ -25,95 +25,114 @@ If environment variable isn't set, try the following:
 - `~/post/clone`
 - `~/clone`
 
-## Build Command
+## New Interface (crs-compose)
 
-Build the project:
+The new oss-crs-2 uses `crs-compose` with compose files.
 
-```bash
-cd $OSS_CRS && uv run oss-bugfind-crs build \
-    --project-image-prefix aixcc-afc \
-    --oss-fuzz-dir $OSS_FUZZ \
-    example_configs/buttercup-scan/ \
-    aixcc/c/sanity-mock-c-delta-01 \
-    $PROJECT_CLONE/mock-c
-```
+### CRS Configuration
 
-## Run Command
+Buttercup uses two configuration layers:
+1. **CRS Definition** (`buttercup-bugfind/oss-crs/crs.yaml`) - Defines services, Dockerfiles, and capabilities
+2. **Compose File** (`oss-crs-2/example_configs/buttercup-scan/buttercup-compose.yaml`) - Specifies runtime resources and source location
 
-Run buttercup (requires `.env` with LITELLM_URL and LITELLM_KEY for LLM features):
+### Prepare Command
+
+Prepare the CRS (pull images, set up dependencies):
 
 ```bash
-cd $OSS_CRS && source .env && uv run oss-bugfind-crs run \
-    --external-litellm \
-    example_configs/buttercup-scan/ \
-    aixcc/c/sanity-mock-c-delta-01 \
-    fuzz_process_input_header
+cd $OSS_CRS && uv run crs-compose prepare \
+    --compose-file ./example_configs/buttercup-scan/buttercup-compose.yaml
 ```
 
-## Run with Diff (Delta Mode)
+### Build Command
 
-For bug-finding with a known vulnerable diff:
+Build the target project:
 
 ```bash
-cd $OSS_CRS && source .env && uv run oss-bugfind-crs run \
-    --external-litellm \
-    --diff $OSS_FUZZ/projects/aixcc/c/sanity-mock-c-delta-01/.aixcc/ref.diff \
-    example_configs/buttercup-scan/ \
-    aixcc/c/sanity-mock-c-delta-01 \
-    fuzz_process_input_header
+cd $OSS_CRS && uv run crs-compose build-target \
+    --compose-file ./example_configs/buttercup-scan/buttercup-compose.yaml \
+    --target-proj-path $OSS_FUZZ/projects/libxml2
 ```
 
-When `--diff` is provided:
-- The diff is mounted at `/ref.diff` in the container
-- Buttercup triggers vulnerability discovery mode
-- LLM analyzes the diff to identify vulnerabilities
-- PoVs are generated targeting the vulnerable code paths
+### Run Command
 
-## Alternative Target: libxml2
-
-Build libxml2:
+Run buttercup (requires LLM API keys for LLM features):
 
 ```bash
-cd $OSS_CRS && uv run oss-bugfind-crs build \
-    --project-image-prefix aixcc-afc \
-    --oss-fuzz-dir $OSS_FUZZ \
-    example_configs/buttercup-scan/ \
-    aixcc/c/afc-libxml2-delta-01 \
-    $PROJECT_CLONE/official-afc-libxml2
+export ANTHROPIC_API_KEY=<your-key>
+export OPENAI_API_KEY=<your-key>
+cd $OSS_CRS && uv run crs-compose run \
+    --compose-file ./example_configs/buttercup-scan/buttercup-compose.yaml \
+    --target-proj-path $OSS_FUZZ/projects/libxml2 \
+    --target-harness xml
 ```
 
-Run libxml2 with html harness:
+### Alternative Target: json-c
 
 ```bash
-cd $OSS_CRS && source .env && uv run oss-bugfind-crs run \
-    --external-litellm \
-    example_configs/buttercup-scan/ \
-    aixcc/c/afc-libxml2-delta-01 \
-    html
+# Build
+cd $OSS_CRS && uv run crs-compose build-target \
+    --compose-file ./example_configs/buttercup-scan/buttercup-compose.yaml \
+    --target-proj-path $OSS_FUZZ/projects/json-c
+
+# Run
+cd $OSS_CRS && uv run crs-compose run \
+    --compose-file ./example_configs/buttercup-scan/buttercup-compose.yaml \
+    --target-proj-path $OSS_FUZZ/projects/json-c \
+    --target-harness json_parse_fuzzer
 ```
+
+### Alternative Target: sanity-mock-c-delta-01 (with separate repo)
+
+For targets where the source repo is separate from the OSS-Fuzz project:
+
+```bash
+# Build
+cd $OSS_CRS && uv run crs-compose build-target \
+    --compose-file ./example_configs/buttercup-scan/buttercup-compose-nollm.yaml \
+    --target-proj-path $OSS_FUZZ/projects/aixcc/c/sanity-mock-c-delta-01 \
+    --target-repo-path $PROJECT_CLONE/mock-c \
+    --no-checkout
+
+# Run
+cd $OSS_CRS && uv run crs-compose run \
+    --compose-file ./example_configs/buttercup-scan/buttercup-compose-nollm.yaml \
+    --target-proj-path $OSS_FUZZ/projects/aixcc/c/sanity-mock-c-delta-01 \
+    --target-repo-path $PROJECT_CLONE/mock-c \
+    --no-checkout \
+    --target-harness fuzz_process_input_header
+```
+
+### No-LLM Configuration
+
+Use `buttercup-compose-nollm.yaml` for fuzzing without LLM seed generation:
+- Faster startup (no LiteLLM setup)
+- No API keys required
+- Useful for testing or when LLM is not needed
 
 ## Usage
 
-- `/run-oss-crs` or `/run-oss-crs build run` - Run both build and run sequentially
-- `/run-oss-crs build` - Just build
+- `/run-oss-crs` or `/run-oss-crs build run` - Run prepare, build, and run sequentially
+- `/run-oss-crs prepare` - Just prepare
+- `/run-oss-crs build` - Just build (assumes prepared)
 - `/run-oss-crs run` - Just run (assumes already built)
 
 ## Environment Variables
 
-The `.env` file in oss-crs-2 should contain:
-- `LITELLM_URL` - LiteLLM proxy URL
-- `LITELLM_KEY` - LiteLLM API key
+LLM API keys can be set as environment variables:
+- `OPENAI_API_KEY` - OpenAI API key
+- `ANTHROPIC_API_KEY` - Anthropic API key
+- `GEMINI_API_KEY` - Gemini API key
+
+Or use `.env` file with `LITELLM_URL` and `LITELLM_KEY` for LiteLLM proxy.
 
 ## Parameters
 
-- `example_configs/buttercup-scan/` - CRS config for buttercup
-- `aixcc/c/sanity-mock-c-delta-01` - Target project config (mock-c)
-- `aixcc/c/afc-libxml2-delta-01` - Target project config (libxml2)
-- `fuzz_process_input_header` - Harness name for mock-c
-- `html` - Harness name for libxml2
-- `--external-litellm` - Use external LiteLLM proxy
-- `--project-image-prefix aixcc-afc` - Docker image prefix
-- `--oss-fuzz-dir` - Path to clean oss-fuzz checkout
+- `--compose-file` - Path to CRS compose YAML file
+- `--target-proj-path` - Path to target project (OSS-Fuzz format)
+- `--target-repo-path` - Path to source repo (if separate from OSS-Fuzz project)
+- `--target-harness` - Harness name to run
+- `--no-checkout` - Skip git checkout (use existing repo state)
 
 ## Interactive Run Behavior
 
@@ -128,28 +147,20 @@ When running the fuzzer:
 4. After confirming success OR after timeout (2 minutes), ask user:
    - "Continue running?" - keep fuzzer going
    - "Stop now?" - stop the container and cleanup
-5. To stop the fuzzer, kill the `oss-bugfind-crs` process (NOT the docker containers directly):
+5. To stop the fuzzer, kill the `crs-compose` process (NOT the docker containers directly):
    ```bash
-   pkill -f "oss-bugfind-crs run"
+   pkill -f "crs-compose run"
    ```
    This automatically cleans up containers properly.
 
 ## Stopping the Fuzzer
 
-**IMPORTANT:** Always stop by killing the `oss-bugfind-crs` process, not the docker containers:
+**IMPORTANT:** Always stop by killing the `crs-compose` process, not the docker containers:
 ```bash
-pkill -f "oss-bugfind-crs run"
+pkill -f "crs-compose run"
 ```
 
 The process handles container cleanup automatically. Do NOT run `docker stop` on crs-run containers directly.
-
-## Emergency Cleanup
-
-Only if the process was killed improperly and containers are orphaned:
-```bash
-docker ps --filter "name=crs-run" -q | xargs -r docker stop
-docker ps --filter "name=crs-run" -aq | xargs -r docker rm
-```
 
 ## Checking Fuzzer Success
 
@@ -182,3 +193,72 @@ View them with:
 docker exec $CONTAINER ls -la /artifacts/corpus/
 docker exec $CONTAINER ls -la /artifacts/povs/
 ```
+
+---
+
+## Legacy Interface (oss-bugfind-crs)
+
+The old oss-crs (at `~/post/oss-crs`) uses the `oss-bugfind-crs` command.
+
+### Legacy Build Command
+
+```bash
+cd $OSS_CRS && uv run oss-bugfind-crs build \
+    --project-image-prefix aixcc-afc \
+    --oss-fuzz-dir $OSS_FUZZ \
+    example_configs/buttercup-scan/ \
+    aixcc/c/sanity-mock-c-delta-01 \
+    $PROJECT_CLONE/mock-c
+```
+
+### Legacy Run Command
+
+```bash
+cd $OSS_CRS && source .env && uv run oss-bugfind-crs run \
+    --external-litellm \
+    example_configs/buttercup-scan/ \
+    aixcc/c/sanity-mock-c-delta-01 \
+    fuzz_process_input_header
+```
+
+### Legacy Run with Diff (Delta Mode)
+
+```bash
+cd $OSS_CRS && source .env && uv run oss-bugfind-crs run \
+    --external-litellm \
+    --diff $OSS_FUZZ/projects/aixcc/c/sanity-mock-c-delta-01/.aixcc/ref.diff \
+    example_configs/buttercup-scan/ \
+    aixcc/c/sanity-mock-c-delta-01 \
+    fuzz_process_input_header
+```
+
+### Legacy libxml2
+
+```bash
+# Build
+cd $OSS_CRS && uv run oss-bugfind-crs build \
+    --project-image-prefix aixcc-afc \
+    --oss-fuzz-dir $OSS_FUZZ \
+    example_configs/buttercup-scan/ \
+    aixcc/c/afc-libxml2-delta-01 \
+    $PROJECT_CLONE/official-afc-libxml2
+
+# Run
+cd $OSS_CRS && source .env && uv run oss-bugfind-crs run \
+    --external-litellm \
+    example_configs/buttercup-scan/ \
+    aixcc/c/afc-libxml2-delta-01 \
+    html
+```
+
+### Legacy Parameters
+
+- `example_configs/buttercup-scan/` - CRS config for buttercup
+- `aixcc/c/sanity-mock-c-delta-01` - Target project config (mock-c)
+- `aixcc/c/afc-libxml2-delta-01` - Target project config (libxml2)
+- `fuzz_process_input_header` - Harness name for mock-c
+- `html` - Harness name for libxml2
+- `--external-litellm` - Use external LiteLLM proxy
+- `--project-image-prefix aixcc-afc` - Docker image prefix
+- `--oss-fuzz-dir` - Path to clean oss-fuzz checkout
+- `--diff` - Path to vulnerable diff for delta mode
