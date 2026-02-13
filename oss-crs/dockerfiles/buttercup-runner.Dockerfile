@@ -117,6 +117,10 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
        exuberant-ctags codequery \
     && rm -rf /var/lib/apt/lists/*
 
+# Download Python WASM for seed-gen sandbox
+RUN curl -fsSLO https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/python%2F3.12.0%2B20231211-040d5a6/python-3.12.0.wasm
+ENV PYTHON_WASM_BUILD_PATH="/python-3.12.0.wasm"
+
 # Copy built Python environments
 COPY --from=fuzzer-builder /app/fuzzer/.venv /app/fuzzer/.venv
 COPY --from=fuzzer-builder /app/fuzzer_runner/.venv /app/fuzzer_runner/.venv
@@ -127,6 +131,7 @@ COPY fuzzer_runner/runner.sh /app/fuzzer_runner/runner.sh
 
 # Copy oss-crs specific files
 COPY oss-crs/orchestrator.py /crs/orchestrator.py
+COPY oss-crs/pov_submitter.py /crs/pov_submitter.py
 COPY oss-crs/bin /crs/bin
 
 # Set up PATH to include all venvs (fuzzer has priority)

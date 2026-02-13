@@ -4,6 +4,10 @@
 ARG target_base_image
 FROM ${target_base_image}
 
+# Fix apt mirror issues (Azure mirror can be slow/unreliable)
+RUN sed -i 's|http://azure.archive.ubuntu.com|http://archive.ubuntu.com|g' /etc/apt/sources.list 2>/dev/null || true && \
+    sed -i 's|http://security.ubuntu.com|http://archive.ubuntu.com|g' /etc/apt/sources.list 2>/dev/null || true
+
 # Install codequery toolchain
 RUN apt-get update && apt-get install -y --no-install-recommends \
     cscope \

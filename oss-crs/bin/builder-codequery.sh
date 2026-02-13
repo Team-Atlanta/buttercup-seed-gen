@@ -140,7 +140,15 @@ ls -la cscope.files cscope.out tags codequery.db 2>/dev/null || true
 
 # Create cqdb output directory with tarball for seed-gen
 # The tarball contains the container_src_dir with codequery indexes
-TASK_ID="${TASK_ID:-oss-crs-task}"
+# Read task_id from task_meta.json to ensure consistent naming
+if [ -f "$TASK_DIR/task_meta.json" ]; then
+    TASK_ID=$(python3 -c "import json; print(json.load(open('$TASK_DIR/task_meta.json'))['task_id'])")
+    echo "[builder-codequery] Using task_id from task_meta.json: $TASK_ID"
+else
+    TASK_ID="${TASK_ID:-oss-crs-task}"
+    echo "[builder-codequery] WARNING: task_meta.json not found, using default TASK_ID: $TASK_ID"
+fi
+
 CQDB_OUTPUT="/cqdb_output"
 mkdir -p "$CQDB_OUTPUT"
 

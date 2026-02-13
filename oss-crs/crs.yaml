@@ -42,6 +42,17 @@ crs_run_phase:
     dockerfile: oss-crs/dockerfiles/buttercup-runner.Dockerfile
     additional_env:
       RUN_TYPE: seedgen
+      # Pass through external LiteLLM config (for use without llm_config)
+      LITELLM_URL: ${LITELLM_URL:-}
+      LITELLM_KEY: ${LITELLM_KEY:-}
+  tracer-bot:
+    dockerfile: oss-crs/dockerfiles/buttercup-runner.Dockerfile
+    additional_env:
+      RUN_TYPE: tracer
+  pov-submitter:
+    dockerfile: oss-crs/dockerfiles/buttercup-runner.Dockerfile
+    additional_env:
+      RUN_TYPE: pov-submitter
 
 supported_target:
   mode:
