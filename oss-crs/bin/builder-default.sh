@@ -403,6 +403,6 @@ echo "[builder-default] Task directory structure:"
 find "$TASK_DIR" -type f | head -20
 
 # Submit build output via libCRS
-libCRS submit-build-output "$TASK_DIR" task
+libCRS submit-build-output "$TASK_DIR" build
 
 echo "[builder-default] Build submitted via libCRS"

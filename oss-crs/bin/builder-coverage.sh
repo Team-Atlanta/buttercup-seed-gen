@@ -299,6 +299,6 @@ echo "[builder-coverage] Artifacts in /artifacts/coverage/"
 ls -la /artifacts/coverage/ | head -20
 
 # Submit coverage build output via libCRS
-libCRS submit-build-output "$TASK_DIR" task-coverage
+libCRS submit-build-output "$TASK_DIR" build-coverage
 
 echo "[builder-coverage] Coverage build submitted via libCRS"

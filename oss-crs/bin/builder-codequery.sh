@@ -14,10 +14,10 @@ TASK_DIR="/artifacts/task"
 echo "[builder-codequery] Starting codequery index build..."
 echo "[builder-codequery] PROJECT_NAME=$PROJECT_NAME"
 
-# Download task from libCRS (created by builder-default.sh in previous phase)
-echo "[builder-codequery] Downloading task from libCRS..."
-libCRS download-build-output task "$TASK_DIR" || {
-    echo "[builder-codequery] WARNING: Could not download task from libCRS, checking if exists locally..."
+# Download build from libCRS (created by builder-default.sh in previous phase)
+echo "[builder-codequery] Downloading build from libCRS..."
+libCRS download-build-output build "$TASK_DIR" || {
+    echo "[builder-codequery] WARNING: Could not download build from libCRS, checking if exists locally..."
 }
 
 # Check that task directory exists
@@ -158,7 +158,7 @@ cd "$TASK_DIR"
 tar -czf "$CQDB_TARBALL" container_src_dir/
 
 # Submit cqdb output via libCRS
-libCRS submit-build-output "$CQDB_OUTPUT" cqdb
+libCRS submit-build-output "$CQDB_OUTPUT" build-codequery
 
 echo "[builder-codequery] Codequery tarball created and submitted"
 echo "[builder-codequery] Cqdb tarball: $CQDB_TARBALL"

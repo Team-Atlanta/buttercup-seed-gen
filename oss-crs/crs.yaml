@@ -11,17 +11,17 @@ target_build_phase:
   - name: build
     dockerfile: oss-crs/dockerfiles/builder.Dockerfile
     outputs:
-      - task
+      - build
   - name: build-coverage
     dockerfile: oss-crs/dockerfiles/builder-coverage.Dockerfile
     outputs:
-      - task-coverage
+      - build-coverage
   - name: build-codequery
     dockerfile: oss-crs/dockerfiles/builder-codequery.Dockerfile
     depends_on:
       - build
     outputs:
-      - cqdb
+      - build-codequery
 
 crs_run_phase:
   redis:

@@ -21,7 +21,7 @@ mkdir -p "$CORPUS_DIR" "$POVS_DIR"
 # Download build outputs from libCRS (except for redis)
 if [ "$RUN_TYPE" != "redis" ]; then
     echo "Downloading build outputs..."
-    libCRS download-build-output task "$TASK_DIR"
+    libCRS download-build-output build "$TASK_DIR"
 
     # Verify task structure
     if [ ! -f "$TASK_DIR/task_meta.json" ]; then
@@ -36,7 +36,7 @@ if [ "$RUN_TYPE" != "redis" ]; then
     if [ "$RUN_TYPE" = "coverage" ]; then
         TASK_COVERAGE_DIR="$ARTIFACTS_DIR/task-coverage"
         echo "Downloading coverage build..."
-        libCRS download-build-output task-coverage "$TASK_COVERAGE_DIR" || {
+        libCRS download-build-output build-coverage "$TASK_COVERAGE_DIR" || {
             echo "WARNING: No coverage build found, coverage-bot may not work"
         }
     fi
@@ -45,8 +45,8 @@ if [ "$RUN_TYPE" != "redis" ]; then
     if [ "$RUN_TYPE" = "seedgen" ]; then
         CQDB_DIR="$ARTIFACTS_DIR/cqdb"
         echo "Downloading codequery database..."
-        libCRS download-build-output cqdb "$CQDB_DIR" || {
-            echo "WARNING: No cqdb build found, seed-gen may not have code analysis"
+        libCRS download-build-output build-codequery "$CQDB_DIR" || {
+            echo "WARNING: No codequery build found, seed-gen may not have code analysis"
         }
         # Extract task_id from task_meta.json for cqdb path
         TASK_ID=$(python3 -c "import json; print(json.load(open('$TASK_DIR/task_meta.json'))['task_id'])")
@@ -117,7 +117,7 @@ case "$RUN_TYPE" in
         # Download coverage build for registration
         TASK_COVERAGE_DIR="$ARTIFACTS_DIR/task-coverage"
         echo "Downloading coverage build for registration..."
-        libCRS download-build-output task-coverage "$TASK_COVERAGE_DIR" || {
+        libCRS download-build-output build-coverage "$TASK_COVERAGE_DIR" || {
             echo "WARNING: No coverage build found"
         }
         export COVERAGE_DIR="$ARTIFACTS_DIR/coverage"
