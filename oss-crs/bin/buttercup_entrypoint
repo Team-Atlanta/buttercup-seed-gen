@@ -1,0 +1,232 @@
+#!/bin/bash
+# Buttercup OSS-CRS Entrypoint
+# Routes to the appropriate service based on RUN_TYPE environment variable
+
+set -e
+
+echo "=== Buttercup CRS Entrypoint ==="
+echo "RUN_TYPE: ${RUN_TYPE:-unset}"
+echo "OSS_CRS_NAME: ${OSS_CRS_NAME:-unset}"
+echo "OSS_CRS_TARGET: ${OSS_CRS_TARGET:-unset}"
+echo "OSS_CRS_TARGET_HARNESS: ${OSS_CRS_TARGET_HARNESS:-unset}"
+
+# Set up working directories
+ARTIFACTS_DIR="/artifacts"
+TASK_DIR="$ARTIFACTS_DIR/task"
+CORPUS_DIR="$ARTIFACTS_DIR/corpus"
+POVS_DIR="$ARTIFACTS_DIR/povs"
+
+mkdir -p "$CORPUS_DIR" "$POVS_DIR"
+
+# Download build outputs from libCRS (except for redis)
+if [ "$RUN_TYPE" != "redis" ]; then
+    echo "Downloading build outputs..."
+    libCRS download-build-output build "$TASK_DIR"
+
+    # Verify task structure
+    if [ ! -f "$TASK_DIR/task_meta.json" ]; then
+        echo "ERROR: task_meta.json not found at $TASK_DIR"
+        exit 1
+    fi
+
+    echo "Task downloaded to: $TASK_DIR"
+    ls -la "$TASK_DIR"
+
+    # Download coverage build for coverage-bot
+    if [ "$RUN_TYPE" = "coverage" ]; then
+        TASK_COVERAGE_DIR="$ARTIFACTS_DIR/task-coverage"
+        echo "Downloading coverage build..."
+        libCRS download-build-output build-coverage "$TASK_COVERAGE_DIR" || {
+            echo "WARNING: No coverage build found, coverage-bot may not work"
+        }
+    fi
+
+    # Download cqdb for seed-gen
+    if [ "$RUN_TYPE" = "seedgen" ]; then
+        CQDB_DIR="$ARTIFACTS_DIR/cqdb"
+        echo "Downloading codequery database..."
+        libCRS download-build-output build-codequery "$CQDB_DIR" || {
+            echo "WARNING: No codequery build found, seed-gen may not have code analysis"
+        }
+        # Extract task_id from task_meta.json for cqdb path
+        TASK_ID=$(python3 -c "import json; print(json.load(open('$TASK_DIR/task_meta.json'))['task_id'])")
+        echo "Task ID for cqdb: $TASK_ID"
+
+        # Find and extract the cqdb tarball into the task directory
+        CQDB_TARBALL=$(find "$CQDB_DIR" -name "*.cqdb.tgz" -type f 2>/dev/null | head -1)
+        if [ -n "$CQDB_TARBALL" ] && [ -f "$CQDB_TARBALL" ]; then
+            echo "Extracting codequery database from $CQDB_TARBALL..."
+            echo "Tarball contents:"
+            tar -tzf "$CQDB_TARBALL" | head -20
+            # Extract directly into task directory (tarball contains container_src_dir/)
+            if tar -xzf "$CQDB_TARBALL" -C "$TASK_DIR"; then
+                echo "Codequery database extracted to $TASK_DIR/container_src_dir/"
+                ls -la "$TASK_DIR/container_src_dir/" 2>/dev/null || echo "WARNING: container_src_dir not found after extraction"
+                ls -la "$TASK_DIR/container_src_dir/codequery.db" 2>/dev/null || echo "WARNING: codequery.db not found"
+            else
+                echo "ERROR: Failed to extract codequery tarball"
+            fi
+        else
+            echo "WARNING: No cqdb tarball found in $CQDB_DIR"
+            ls -la "$CQDB_DIR" 2>/dev/null || true
+        fi
+    fi
+fi
+
+# Get Redis service domain and wait for it to be available
+if [ "$RUN_TYPE" != "redis" ]; then
+    REDIS_HOST=$(libCRS get-service-domain redis)
+    export REDIS_URL="redis://${REDIS_HOST}:6379"
+    echo "Redis URL: $REDIS_URL"
+
+    # Wait for Redis to be available (max 60 seconds)
+    echo "Waiting for Redis at ${REDIS_HOST}:6379..."
+    for i in $(seq 1 60); do
+        # Try to connect using timeout and bash's /dev/tcp
+        if timeout 1 bash -c "echo > /dev/tcp/${REDIS_HOST}/6379" 2>/dev/null; then
+            echo "Redis is available!"
+            break
+        fi
+        if [ "$i" -eq 60 ]; then
+            echo "WARNING: Redis not available after 60 seconds, continuing anyway..."
+        fi
+        sleep 1
+    done
+fi
+
+# Map OSS-CRS LLM environment variables to Buttercup format
+# Priority: OSS_CRS_LLM_* > LITELLM_* (for external proxy support)
+if [ -n "$OSS_CRS_LLM_API_URL" ]; then
+    export BUTTERCUP_LITELLM_HOSTNAME="$OSS_CRS_LLM_API_URL"
+elif [ -n "$LITELLM_URL" ]; then
+    export BUTTERCUP_LITELLM_HOSTNAME="$LITELLM_URL"
+    echo "Using external LiteLLM: $LITELLM_URL"
+fi
+if [ -n "$OSS_CRS_LLM_API_KEY" ]; then
+    export BUTTERCUP_LITELLM_KEY="$OSS_CRS_LLM_API_KEY"
+elif [ -n "$LITELLM_KEY" ]; then
+    export BUTTERCUP_LITELLM_KEY="$LITELLM_KEY"
+fi
+
+# Export common environment variables for buttercup services
+export TASK_DIR
+export NODE_DATA_DIR="$ARTIFACTS_DIR"
+
+# Route to the appropriate service
+case "$RUN_TYPE" in
+    redis)
+        echo "Starting Redis..."
+        exec redis-server --save "" --appendonly no
+        ;;
+    orchestrator)
+        echo "Starting Orchestrator..."
+        # Download coverage build for registration
+        TASK_COVERAGE_DIR="$ARTIFACTS_DIR/task-coverage"
+        echo "Downloading coverage build for registration..."
+        libCRS download-build-output build-coverage "$TASK_COVERAGE_DIR" || {
+            echo "WARNING: No coverage build found"
+        }
+        export COVERAGE_DIR="$ARTIFACTS_DIR/coverage"
+        export HARNESS_NAME="${OSS_CRS_TARGET_HARNESS:-}"
+        exec python /crs/orchestrator.py
+        ;;
+    fuzzer)
+        echo "Starting Fuzzer Bot..."
+        # Register submit directory for seeds only
+        # POVs are submitted by pov-submitter after tracer validation
+        libCRS register-submit-dir seed "$CORPUS_DIR" --log /tmp/seed_submit.log &
+
+        # Set up shared directory for corpus
+        libCRS register-shared-dir /shared-corpus corpus || true
+
+        # Use OSS_CRS_SHARED_DIR for fuzzer working directory so crashes are accessible
+        # to tracer-bot and pov-submitter via the shared filesystem
+        FUZZER_WDIR="${OSS_CRS_SHARED_DIR:-$ARTIFACTS_DIR}"
+        echo "Fuzzer working directory: $FUZZER_WDIR"
+
+        export BUTTERCUP_FUZZER_REDIS_URL="$REDIS_URL"
+        export BUTTERCUP_FUZZER_TIMER=5000
+        export BUTTERCUP_FUZZER_WDIR="$FUZZER_WDIR"
+        export BUTTERCUP_FUZZER_CRS_SCRATCH_DIR="$FUZZER_WDIR"
+        export BUTTERCUP_FUZZER_RUNNER_PATH="/app/fuzzer_runner/runner.sh"
+        export BUTTERCUP_FUZZER_TIMEOUT=60000
+        export BUTTERCUP_FUZZER_LOG_LEVEL=INFO
+        export NODE_DATA_DIR="$FUZZER_WDIR"
+        exec buttercup-fuzzer
+        ;;
+    coverage)
+        echo "Starting Coverage Bot..."
+        # Use OSS_CRS_SHARED_DIR to access corpus from fuzzer-bot
+        COVERAGE_WDIR="${OSS_CRS_SHARED_DIR:-$ARTIFACTS_DIR}"
+        echo "Coverage working directory: $COVERAGE_WDIR"
+
+        export BUTTERCUP_FUZZER_REDIS_URL="$REDIS_URL"
+        export BUTTERCUP_FUZZER_TIMER=30000
+        export BUTTERCUP_FUZZER_WDIR="$COVERAGE_WDIR"
+        export BUTTERCUP_FUZZER_ALLOW_PULL=true
+        export BUTTERCUP_FUZZER_LOG_LEVEL=INFO
+        export NODE_DATA_DIR="$COVERAGE_WDIR"
+        exec buttercup-coverage-bot
+        ;;
+    seedgen)
+        echo "Starting Seed-Gen..."
+        # Use OSS_CRS_SHARED_DIR for seeds so they persist to host
+        # Seeds will be stored at $OSS_CRS_SHARED_DIR/{task_id}/buttercup_corpus_{harness}
+        SEED_WDIR="${OSS_CRS_SHARED_DIR:-$ARTIFACTS_DIR}"
+        echo "Seed-gen working directory: $SEED_WDIR"
+
+        # Register submit directories for seeds from the shared dir
+        # Seeds go to $SEED_WDIR/{task_id}/buttercup_corpus_{harness}
+        # We register the whole wdir to catch all corpus directories
+        libCRS register-submit-dir seed "$SEED_WDIR" --log /tmp/seed_submit.log &
+
+        # NODE_DATA_DIR must match WDIR for node_local.py path assertions
+        export NODE_DATA_DIR="$SEED_WDIR"
+        export BUTTERCUP_SEED_GEN_SERVER__REDIS_URL="$REDIS_URL"
+        export BUTTERCUP_SEED_GEN_SERVER__SLEEP_TIME=10
+        export BUTTERCUP_SEED_GEN_SERVER__CORPUS_ROOT="$SEED_WDIR"
+        export BUTTERCUP_SEED_GEN_WDIR="$SEED_WDIR"
+        export BUTTERCUP_SEED_GEN_LOG_LEVEL=INFO
+        exec seed-gen server
+        ;;
+    tracer)
+        echo "Starting Tracer Bot..."
+        # Tracer-bot validates crashes by reproducing them
+        # It consumes from CRASH queue and produces to TRACED_VULNERABILITIES queue
+
+        # Use OSS_CRS_SHARED_DIR to access crash files written by fuzzer-bot
+        TRACER_WDIR="${OSS_CRS_SHARED_DIR:-$ARTIFACTS_DIR}"
+        echo "Tracer working directory: $TRACER_WDIR"
+
+        export BUTTERCUP_FUZZER_REDIS_URL="$REDIS_URL"
+        export BUTTERCUP_FUZZER_TIMER=5000
+        export BUTTERCUP_FUZZER_WDIR="$TRACER_WDIR"
+        export BUTTERCUP_FUZZER_LOG_LEVEL=INFO
+        export BUTTERCUP_FUZZER_MAX_TRIES=3
+        export NODE_DATA_DIR="$TRACER_WDIR"
+        exec buttercup-tracer-bot
+        ;;
+    pov-submitter)
+        echo "Starting POV Submitter..."
+        # POV submitter consumes validated crashes from TRACED_VULNERABILITIES queue
+        # and saves them to POVS_DIR for submission via libCRS
+
+        # Register POV submit directory with libCRS
+        libCRS register-submit-dir pov "$POVS_DIR" --log /tmp/pov_submit.log &
+
+        # Use OSS_CRS_SHARED_DIR to access crash files
+        POV_WDIR="${OSS_CRS_SHARED_DIR:-$ARTIFACTS_DIR}"
+        echo "POV submitter working directory: $POV_WDIR"
+
+        export REDIS_URL
+        export POVS_DIR
+        export WDIR="$POV_WDIR"
+        export SLEEP_SECONDS=5
+        exec python /crs/pov_submitter.py
+        ;;
+    *)
+        echo "ERROR: Unknown RUN_TYPE: $RUN_TYPE"
+        echo "Valid values: redis, orchestrator, fuzzer, coverage, seedgen, tracer, pov-submitter"
+        exit 1
+        ;;
+esac

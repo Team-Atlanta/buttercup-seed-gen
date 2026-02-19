@@ -1,0 +1,7 @@
+# Install buttercup packages from copied source
+/src/buttercup/common
+/src/buttercup/fuzzer_runner
+
+# Dependencies for OSS-CRS thin wrappers
+httpx>=0.24.0
+redis>=5.0.0

@@ -1,0 +1,14 @@
+ARG parent_image
+FROM $parent_image
+
+# Install codequery toolchain
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cscope \
+    exuberant-ctags \
+    codequery \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY builder-codequery.sh /builder-codequery.sh
+RUN chmod +x /builder-codequery.sh
+
+CMD ["/builder-codequery.sh"]

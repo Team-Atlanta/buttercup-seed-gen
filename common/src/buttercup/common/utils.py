@@ -2,6 +2,7 @@ import errno
 import logging
 import os
 import shutil
+import stat
 import threading
 import time
 from collections.abc import Callable
@@ -16,16 +17,40 @@ _reaper_thread = None
 _reaper_stop_event = None
 
 
+def _fix_execute_permissions(src: Path, dst: Path) -> None:
+    """Ensure executable files in dst have the same execute permissions as src.
+
+    This is needed because shutil.copytree may not preserve execute bits correctly
+    on some filesystems (e.g., tmpfs) or cross-filesystem copies.
+    """
+    if src.is_file():
+        src_mode = src.stat().st_mode
+        if src_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH):
+            # Source is executable, ensure dst is too
+            dst_mode = dst.stat().st_mode
+            new_mode = dst_mode | (src_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
+            if new_mode != dst_mode:
+                os.chmod(dst, new_mode)
+    elif src.is_dir():
+        for src_child in src.iterdir():
+            dst_child = dst / src_child.name
+            if dst_child.exists():
+                _fix_execute_permissions(src_child, dst_child)
+
+
 def copyanything(src: PathLike, dst: PathLike, **kwargs: Any) -> None:
     """Copy a file or directory to a destination.
     This function will:
     - Copy directories recursively
     - Copy single files
     - Handle existing destinations
+    - Preserve execute permissions (even on cross-filesystem copies)
     """
     src, dst = Path(src), Path(dst)
     try:
         shutil.copytree(src, dst, dirs_exist_ok=True, ignore_dangling_symlinks=True, **kwargs)
+        # Fix execute permissions that may be lost in cross-filesystem copies
+        _fix_execute_permissions(src, dst)
     except shutil.Error:
         logger.exception(f"Some errors occurred while copying {src} to {dst}, continuing anyway...")
     except OSError as exc:  # python >2.5

@@ -12,7 +12,7 @@ from buttercup.common.project_yaml import ProjectYaml
 from buttercup.common.queues import QueueFactory, QueueNames
 from buttercup.common.reproduce_multiple import ReproduceMultiple
 from buttercup.common.sarif_store import SARIFStore
-from buttercup.common.stack_parsing import CrashSet
+from buttercup.common.crash_set import CrashSet
 from buttercup.program_model.codequery import CodeQueryPersistent
 from redis import Redis
 
@@ -130,6 +130,9 @@ class SeedGenBot(TaskLoop):
         ro_challenge_task = ChallengeTask(read_only_task_dir=build_dir)
         project_yaml = ProjectYaml(ro_challenge_task, task.package_name)
         task_id = ro_challenge_task.task_meta.task_id
+
+        # Ensure the task-specific work directory exists
+        (self.wdir / task_id).mkdir(parents=True, exist_ok=True)
 
         with (
             tempfile.TemporaryDirectory(dir=self.wdir / task_id, prefix="seedgen-") as temp_dir_str,
