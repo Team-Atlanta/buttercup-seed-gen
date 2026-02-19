@@ -56,10 +56,16 @@ if [ "$RUN_TYPE" != "redis" ]; then
         CQDB_TARBALL=$(find "$CQDB_DIR" -name "*.cqdb.tgz" -type f 2>/dev/null | head -1)
         if [ -n "$CQDB_TARBALL" ] && [ -f "$CQDB_TARBALL" ]; then
             echo "Extracting codequery database from $CQDB_TARBALL..."
+            echo "Tarball contents:"
+            tar -tzf "$CQDB_TARBALL" | head -20
             # Extract directly into task directory (tarball contains container_src_dir/)
-            tar -xzf "$CQDB_TARBALL" -C "$TASK_DIR"
-            echo "Codequery database extracted to $TASK_DIR/container_src_dir/"
-            ls -la "$TASK_DIR/container_src_dir/" 2>/dev/null || echo "WARNING: container_src_dir not found after extraction"
+            if tar -xzf "$CQDB_TARBALL" -C "$TASK_DIR"; then
+                echo "Codequery database extracted to $TASK_DIR/container_src_dir/"
+                ls -la "$TASK_DIR/container_src_dir/" 2>/dev/null || echo "WARNING: container_src_dir not found after extraction"
+                ls -la "$TASK_DIR/container_src_dir/codequery.db" 2>/dev/null || echo "WARNING: codequery.db not found"
+            else
+                echo "ERROR: Failed to extract codequery tarball"
+            fi
         else
             echo "WARNING: No cqdb tarball found in $CQDB_DIR"
             ls -la "$CQDB_DIR" 2>/dev/null || true

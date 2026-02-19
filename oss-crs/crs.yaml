@@ -67,7 +67,8 @@ supported_target:
     - x86_64
 
 # LLMs are optional - uncomment for LLM-powered seed generation
-# required_llms:
-#   - claude-sonnet-4-5-20250929
-#   - gpt-4.1
-#   - gpt-4.1-mini
+required_llms:
+  - claude-sonnet-4-20250514
+  - claude-sonnet-4-5-20250929
+  - gpt-4o
+  - gpt-4o-mini

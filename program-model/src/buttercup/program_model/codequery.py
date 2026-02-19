@@ -307,10 +307,24 @@ class CodeQuery:
             )
             output = result.stdout
         except subprocess.CalledProcessError as e:
+            logger.error(f"cqsearch failed with stderr: {e.stderr}")
+            logger.error(f"cqsearch cwd: {self._get_container_src_dir()}")
             raise RuntimeError(f"Failed to run cqsearch: {e}")
 
         results = [CQSearchResult.from_line(line) for line in output.splitlines()]
         return [result for result in results if result is not None]
+
+    def _path_for_cqsearch(self, path: Path) -> str:
+        """Convert a path to the format expected by cqsearch -b flag.
+
+        The codequery database indexes files with relative paths (e.g., ./src/mock.c)
+        but callers may pass absolute container paths (e.g., /src/mock.c).
+        This method converts absolute paths to relative paths for cqsearch.
+        """
+        path_str = path.as_posix()
+        if path_str.startswith("/"):
+            path_str = "." + path_str
+        return path_str
 
     def _rebase_path(self, path: Path) -> Path:
         if CONTAINER_SRC_DIR not in path.parts:
@@ -399,8 +413,8 @@ class CodeQuery:
                 "-e",
                 "-u",
             ]
-            if file_path:
-                cqsearch_args += ["-b", file_path.as_posix()]
+            # Note: -b flag is not supported in all cqsearch versions
+            # We filter by file_path in Python after getting results
 
             # log telemetry
             tracer = trace.get_tracer(__name__)
@@ -417,7 +431,15 @@ class CodeQuery:
                         "crs.action.code.function_name": function_name,
                     },
                 )
-                results.extend(self._run_cqsearch(*cqsearch_args))
+                cq_results = self._run_cqsearch(*cqsearch_args)
+                # Filter by file_path if specified (cqsearch -b flag not supported in all versions)
+                if file_path:
+                    file_path_str = self._path_for_cqsearch(file_path)
+                    cq_results = [
+                        r for r in cq_results
+                        if file_path_str in str(r.file) or str(r.file) in file_path_str
+                    ]
+                results.extend(cq_results)
                 span.set_status(Status(StatusCode.OK))
 
         # Extended fuzzy matching
@@ -607,7 +629,7 @@ class CodeQuery:
             # path to cqsearch args because (by definition) the callees are called in
             # the same file as the function.
             if file_path:
-                cqsearch_args += ["-b", file_path.as_posix()]
+                cqsearch_args += ["-b", self._path_for_cqsearch(file_path)]
 
             # log telemetry
             tracer = trace.get_tracer(__name__)
@@ -718,7 +740,7 @@ class CodeQuery:
                 "-u",
             ]
             if file_path:
-                cqsearch_args += ["-b", file_path.as_posix()]
+                cqsearch_args += ["-b", self._path_for_cqsearch(file_path)]
 
             # log telemetry
             tracer = trace.get_tracer(__name__)
