@@ -1,9 +1,0 @@
-ARG parent_image
-FROM $parent_image
-
-# Copy build script
-COPY builder-coverage.sh /builder-coverage.sh
-RUN chmod +x /builder-coverage.sh
-
-# Run the coverage builder - creates coverage build in /artifacts
-CMD ["/builder-coverage.sh"]

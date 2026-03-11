@@ -1,16 +1,17 @@
 ---
 name: run-oss-crs
-description: Build and run buttercup through oss-crs-2
+description: Build and run buttercup through oss-crs-6
 ---
 
 # OSS-CRS Build & Run for Buttercup
 
-This skill builds and runs the buttercup fuzzer through oss-crs-2.
+This skill builds and runs the buttercup fuzzer through oss-crs-6.
 
 ## Working Directory
 
 All commands run from `$OSS_CRS`.
 If environment variable isn't set, try the following:
+- `~/post/oss-crs-6`
 - `~/post/oss-crs-2`
 - `~/projects/oss-crs`
 or crawl to see if you can find a dir.
@@ -25,23 +26,25 @@ If environment variable isn't set, try the following:
 - `~/post/clone`
 - `~/clone`
 
-## New Interface (crs-compose)
+## Current Interface (oss-crs-6)
 
-The new oss-crs-2 uses `crs-compose` with compose files.
+The current oss-crs-6 uses the `oss-crs` command with compose files.
+
+**IMPORTANT:** Always `source .env` before running commands.
 
 ### CRS Configuration
 
 Buttercup uses two configuration layers:
 1. **CRS Definition** (`buttercup-bugfind/oss-crs/crs.yaml`) - Defines services, Dockerfiles, and capabilities
-2. **Compose File** (`oss-crs-2/example_configs/buttercup-scan/buttercup-compose.yaml`) - Specifies runtime resources and source location
+2. **Compose File** (`oss-crs-6/example/buttercup-bugfind/buttercup-compose.yaml`) - Specifies runtime resources and source location
 
 ### Prepare Command
 
 Prepare the CRS (pull images, set up dependencies):
 
 ```bash
-cd $OSS_CRS && uv run crs-compose prepare \
-    --compose-file ./example_configs/buttercup-scan/buttercup-compose.yaml
+cd $OSS_CRS && source .env && uv run oss-crs prepare \
+    --compose-file ./example/buttercup-bugfind/buttercup-compose.yaml
 ```
 
 ### Build Command
@@ -49,66 +52,41 @@ cd $OSS_CRS && uv run crs-compose prepare \
 Build the target project:
 
 ```bash
-cd $OSS_CRS && uv run crs-compose build-target \
-    --compose-file ./example_configs/buttercup-scan/buttercup-compose.yaml \
-    --target-proj-path $OSS_FUZZ/projects/libxml2
+cd $OSS_CRS && source .env && uv run oss-crs build-target \
+    --compose-file ./example/buttercup-bugfind/buttercup-compose.yaml \
+    --fuzz-proj-path $OSS_FUZZ/projects/aixcc/c/sanity-mock-c-delta-01 \
+    --target-source-path $PROJECT_CLONE/mock-c
 ```
 
 ### Run Command
 
-Run buttercup (requires LLM API keys for LLM features):
+Run buttercup (LLM keys configured via .env and litellm-config.yaml):
 
 ```bash
-export ANTHROPIC_API_KEY=<your-key>
-export OPENAI_API_KEY=<your-key>
-cd $OSS_CRS && uv run crs-compose run \
-    --compose-file ./example_configs/buttercup-scan/buttercup-compose.yaml \
-    --target-proj-path $OSS_FUZZ/projects/libxml2 \
-    --target-harness xml
-```
-
-### Alternative Target: json-c
-
-```bash
-# Build
-cd $OSS_CRS && uv run crs-compose build-target \
-    --compose-file ./example_configs/buttercup-scan/buttercup-compose.yaml \
-    --target-proj-path $OSS_FUZZ/projects/json-c
-
-# Run
-cd $OSS_CRS && uv run crs-compose run \
-    --compose-file ./example_configs/buttercup-scan/buttercup-compose.yaml \
-    --target-proj-path $OSS_FUZZ/projects/json-c \
-    --target-harness json_parse_fuzzer
-```
-
-### Alternative Target: sanity-mock-c-delta-01 (with separate repo)
-
-For targets where the source repo is separate from the OSS-Fuzz project:
-
-```bash
-# Build
-cd $OSS_CRS && uv run crs-compose build-target \
-    --compose-file ./example_configs/buttercup-scan/buttercup-compose-nollm.yaml \
-    --target-proj-path $OSS_FUZZ/projects/aixcc/c/sanity-mock-c-delta-01 \
-    --target-repo-path $PROJECT_CLONE/mock-c \
-    --no-checkout
-
-# Run
-cd $OSS_CRS && uv run crs-compose run \
-    --compose-file ./example_configs/buttercup-scan/buttercup-compose-nollm.yaml \
-    --target-proj-path $OSS_FUZZ/projects/aixcc/c/sanity-mock-c-delta-01 \
-    --target-repo-path $PROJECT_CLONE/mock-c \
-    --no-checkout \
+cd $OSS_CRS && source .env && uv run oss-crs run \
+    --compose-file ./example/buttercup-bugfind/buttercup-compose.yaml \
+    --fuzz-proj-path $OSS_FUZZ/projects/aixcc/c/sanity-mock-c-delta-01 \
+    --target-source-path $PROJECT_CLONE/mock-c \
     --target-harness fuzz_process_input_header
 ```
 
-### No-LLM Configuration
+### Alternative Targets
 
-Use `buttercup-compose-nollm.yaml` for fuzzing without LLM seed generation:
-- Faster startup (no LiteLLM setup)
-- No API keys required
-- Useful for testing or when LLM is not needed
+**libxml2:**
+```bash
+# Build
+cd $OSS_CRS && source .env && uv run oss-crs build-target \
+    --compose-file ./example/buttercup-bugfind/buttercup-compose.yaml \
+    --fuzz-proj-path $OSS_FUZZ/projects/aixcc/c/afc-libxml2-delta-01 \
+    --target-source-path $PROJECT_CLONE/official-afc-libxml2
+
+# Run
+cd $OSS_CRS && source .env && uv run oss-crs run \
+    --compose-file ./example/buttercup-bugfind/buttercup-compose.yaml \
+    --fuzz-proj-path $OSS_FUZZ/projects/aixcc/c/afc-libxml2-delta-01 \
+    --target-source-path $PROJECT_CLONE/official-afc-libxml2 \
+    --target-harness html
+```
 
 ## Usage
 
@@ -119,68 +97,53 @@ Use `buttercup-compose-nollm.yaml` for fuzzing without LLM seed generation:
 
 ## Environment Variables
 
-LLM API keys can be set as environment variables:
-- `OPENAI_API_KEY` - OpenAI API key
-- `ANTHROPIC_API_KEY` - Anthropic API key
-- `GEMINI_API_KEY` - Gemini API key
-
-Or use `.env` file with `LITELLM_URL` and `LITELLM_KEY` for LiteLLM proxy.
+LLM API keys are configured via `.env` file (source it before running):
+- Contains `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`
+- LiteLLM config in `./example/buttercup-bugfind/litellm-config.yaml`
 
 ## Parameters
 
 - `--compose-file` - Path to CRS compose YAML file
-- `--target-proj-path` - Path to target project (OSS-Fuzz format)
-- `--target-repo-path` - Path to source repo (if separate from OSS-Fuzz project)
+- `--fuzz-proj-path` - Path to target project (OSS-Fuzz format)
+- `--target-source-path` - Path to source repo (if separate from OSS-Fuzz project)
 - `--target-harness` - Harness name to run
-- `--no-checkout` - Skip git checkout (use existing repo state)
 
 ## Interactive Run Behavior
 
 When running the fuzzer:
 1. Start the run command in the background
-2. Wait for initial output (30-60 seconds) to confirm startup success
+2. Wait for initial output (60-120 seconds) to confirm startup success
 3. Look for these success indicators in the logs:
-   - "Starting Buttercup CRS for harness:"
-   - "Starting fuzzer with timeout="
-   - "Fuzzing iteration X:" (continuous operation)
-   - "New crash found:" (if finding bugs)
+   - "Initializing codequery" - CodeQuery database loaded
+   - "Running seed-gen task:" - Seed generation running
+   - "Copied X files to corpus" - Seeds generated
 4. After confirming success OR after timeout (2 minutes), ask user:
    - "Continue running?" - keep fuzzer going
-   - "Stop now?" - stop the container and cleanup
-5. To stop the fuzzer, kill the `crs-compose` process (NOT the docker containers directly):
-   ```bash
-   pkill -f "crs-compose run"
-   ```
-   This automatically cleans up containers properly.
+   - "Stop now?" - stop and cleanup
 
 ## Stopping the Fuzzer
 
-**IMPORTANT:** Always stop by killing the `crs-compose` process, not the docker containers:
+**IMPORTANT:** Always stop by killing the `oss-crs` process, not the docker containers:
 ```bash
-pkill -f "crs-compose run"
+pkill -f "oss-crs run"
 ```
 
-The process handles container cleanup automatically. Do NOT run `docker stop` on crs-run containers directly.
+The process handles container cleanup automatically. Do NOT run `docker stop` on containers directly - this can kill unrelated containers.
 
 ## Checking Fuzzer Success
 
 ### Container Logs
 
-Look for these log messages:
-- `"Starting Buttercup CRS for harness:"` - Fuzzer starting
-- `"LLM available: True"` - LLM seed generation enabled
-- `"Delta mode: True"` - Vulnerability discovery mode active
-- `"Running seed initialization"` - LLM generating seeds
-- `"Generated X seeds"` - LLM produced seeds
-- `"Starting fuzzing phase"` - ClusterFuzz fuzzing started
-- `"Fuzzing iteration X:"` - Continuous fuzzing in progress
-- `"New crash found:"` - Bug discovered
-- `"Fuzzing complete after X iterations"` - Final results
-
 ```bash
-CONTAINER=$(docker ps --filter "name=crs-run" -q | head -1)
-docker logs $CONTAINER 2>&1 | grep -E "(Starting Buttercup|LLM available|Delta mode|Generated.*seeds|Fuzzing iteration|New crash|Fuzzing complete)"
+SEED_GEN=$(docker ps --filter "name=seed-gen" -q | head -1)
+docker logs "$SEED_GEN" 2>&1 | tail -100
 ```
+
+Look for these log messages:
+- `"Initializing codequery"` - CodeQuery loaded successfully
+- `"Running seed-gen task: seed-init"` - Initial seed generation
+- `"Running seed-gen task: seed-explore"` - Coverage-guided seed generation
+- `"Copied X files to corpus"` - Seeds produced
 
 ### Output Locations
 
@@ -188,77 +151,35 @@ Generated artifacts are in:
 - `/artifacts/corpus/` - Fuzzing corpus (test inputs)
 - `/artifacts/povs/` - Proof of Vulnerability files (crashes)
 
-View them with:
-```bash
-docker exec $CONTAINER ls -la /artifacts/corpus/
-docker exec $CONTAINER ls -la /artifacts/povs/
-```
-
 ---
 
-## Legacy Interface (oss-bugfind-crs)
+## Legacy Interface (oss-crs-2 with crs-compose)
 
-The old oss-crs (at `~/post/oss-crs`) uses the `oss-bugfind-crs` command.
+The older oss-crs-2 uses the `crs-compose` command.
 
 ### Legacy Build Command
 
 ```bash
-cd $OSS_CRS && uv run oss-bugfind-crs build \
-    --project-image-prefix aixcc-afc \
-    --oss-fuzz-dir $OSS_FUZZ \
-    example_configs/buttercup-scan/ \
-    aixcc/c/sanity-mock-c-delta-01 \
-    $PROJECT_CLONE/mock-c
+cd $OSS_CRS && uv run crs-compose build-target \
+    --compose-file ./example_configs/buttercup-scan/buttercup-compose.yaml \
+    --target-proj-path $OSS_FUZZ/projects/aixcc/c/sanity-mock-c-delta-01 \
+    --target-repo-path $PROJECT_CLONE/mock-c \
+    --no-checkout
 ```
 
 ### Legacy Run Command
 
 ```bash
-cd $OSS_CRS && source .env && uv run oss-bugfind-crs run \
-    --external-litellm \
-    example_configs/buttercup-scan/ \
-    aixcc/c/sanity-mock-c-delta-01 \
-    fuzz_process_input_header
-```
-
-### Legacy Run with Diff (Delta Mode)
-
-```bash
-cd $OSS_CRS && source .env && uv run oss-bugfind-crs run \
-    --external-litellm \
-    --diff $OSS_FUZZ/projects/aixcc/c/sanity-mock-c-delta-01/.aixcc/ref.diff \
-    example_configs/buttercup-scan/ \
-    aixcc/c/sanity-mock-c-delta-01 \
-    fuzz_process_input_header
-```
-
-### Legacy libxml2
-
-```bash
-# Build
-cd $OSS_CRS && uv run oss-bugfind-crs build \
-    --project-image-prefix aixcc-afc \
-    --oss-fuzz-dir $OSS_FUZZ \
-    example_configs/buttercup-scan/ \
-    aixcc/c/afc-libxml2-delta-01 \
-    $PROJECT_CLONE/official-afc-libxml2
-
-# Run
-cd $OSS_CRS && source .env && uv run oss-bugfind-crs run \
-    --external-litellm \
-    example_configs/buttercup-scan/ \
-    aixcc/c/afc-libxml2-delta-01 \
-    html
+cd $OSS_CRS && uv run crs-compose run \
+    --compose-file ./example_configs/buttercup-scan/buttercup-compose.yaml \
+    --target-proj-path $OSS_FUZZ/projects/aixcc/c/sanity-mock-c-delta-01 \
+    --target-repo-path $PROJECT_CLONE/mock-c \
+    --no-checkout \
+    --target-harness fuzz_process_input_header
 ```
 
 ### Legacy Parameters
 
-- `example_configs/buttercup-scan/` - CRS config for buttercup
-- `aixcc/c/sanity-mock-c-delta-01` - Target project config (mock-c)
-- `aixcc/c/afc-libxml2-delta-01` - Target project config (libxml2)
-- `fuzz_process_input_header` - Harness name for mock-c
-- `html` - Harness name for libxml2
-- `--external-litellm` - Use external LiteLLM proxy
-- `--project-image-prefix aixcc-afc` - Docker image prefix
-- `--oss-fuzz-dir` - Path to clean oss-fuzz checkout
-- `--diff` - Path to vulnerable diff for delta mode
+- `--target-proj-path` - Path to target project (deprecated, use `--fuzz-proj-path`)
+- `--target-repo-path` - Path to source repo (deprecated, use `--target-source-path`)
+- `--no-checkout` - Skip git checkout (no longer needed in oss-crs-6)
