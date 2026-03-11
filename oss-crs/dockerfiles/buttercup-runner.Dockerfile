@@ -35,35 +35,6 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
        docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
     && rm -rf /var/lib/apt/lists/*
 
-# Build stage for fuzzer components
-FROM base-image AS fuzzer-builder
-
-WORKDIR /app
-
-# Install dependencies for fuzzer-bot
-# hadolint ignore=DL3003
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=common/uv.lock,target=common/uv.lock \
-    --mount=type=bind,source=common/pyproject.toml,target=common/pyproject.toml \
-    --mount=type=bind,source=common/README.md,target=common/README.md \
-    --mount=type=bind,source=fuzzer/uv.lock,target=fuzzer/uv.lock \
-    --mount=type=bind,source=fuzzer/pyproject.toml,target=fuzzer/pyproject.toml \
-    --mount=type=bind,source=fuzzer_runner/uv.lock,target=fuzzer_runner/uv.lock \
-    --mount=type=bind,source=fuzzer_runner/pyproject.toml,target=fuzzer_runner/pyproject.toml \
-    cd fuzzer && uv sync --frozen --no-install-project --no-editable && cd .. \
-    && cd fuzzer_runner && uv sync --frozen --no-install-project --no-editable && cd ..
-
-COPY common /app/common
-COPY fuzzer /app/fuzzer
-COPY fuzzer_runner /app/fuzzer_runner
-
-# hadolint ignore=DL3003
-RUN --mount=type=cache,target=/root/.cache/uv \
-    cd fuzzer && uv sync --frozen --no-editable
-# hadolint ignore=DL3003
-RUN --mount=type=cache,target=/root/.cache/uv \
-    cd fuzzer_runner && uv sync --frozen --no-editable
-
 # Build stage for seed-gen components
 FROM base-image AS seedgen-builder
 
@@ -88,6 +59,27 @@ COPY seed-gen /app/seed-gen
 # hadolint ignore=DL3003
 RUN --mount=type=cache,target=/root/.cache/uv \
     cd seed-gen && uv sync --frozen --no-editable
+
+# Build stage for fuzzer components (coverage-bot)
+FROM base-image AS fuzzer-builder
+
+WORKDIR /app
+
+# hadolint ignore=DL3003
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=common/uv.lock,target=common/uv.lock \
+    --mount=type=bind,source=common/pyproject.toml,target=common/pyproject.toml \
+    --mount=type=bind,source=common/README.md,target=common/README.md \
+    --mount=type=bind,source=fuzzer/uv.lock,target=fuzzer/uv.lock \
+    --mount=type=bind,source=fuzzer/pyproject.toml,target=fuzzer/pyproject.toml \
+    cd fuzzer && uv sync --frozen --no-install-project --no-editable
+
+COPY common /app/common
+COPY fuzzer /app/fuzzer
+
+# hadolint ignore=DL3003
+RUN --mount=type=cache,target=/root/.cache/uv \
+    cd fuzzer && uv sync --frozen --no-editable
 
 # Build cscope for seed-gen
 FROM runner-base AS cscope-builder
@@ -118,19 +110,20 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy built Python environments
-COPY --from=fuzzer-builder /app/fuzzer/.venv /app/fuzzer/.venv
-COPY --from=fuzzer-builder /app/fuzzer_runner/.venv /app/fuzzer_runner/.venv
 COPY --from=seedgen-builder /app/seed-gen/.venv /app/seed-gen/.venv
+COPY --from=fuzzer-builder /app/fuzzer/.venv /app/fuzzer/.venv
 
-# Copy runner script
-COPY fuzzer_runner/runner.sh /app/fuzzer_runner/runner.sh
+# Download Python WASM build for seed-gen sandbox
+RUN curl -fsSL -o /opt/python-3.12.0.wasm \
+    "https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/python%2F3.12.0%2B20231211-040d5a6/python-3.12.0.wasm"
+ENV PYTHON_WASM_BUILD_PATH=/opt/python-3.12.0.wasm
 
 # Copy oss-crs specific files
 COPY oss-crs/orchestrator.py /crs/orchestrator.py
 COPY oss-crs/bin /crs/bin
 
-# Set up PATH to include all venvs (fuzzer has priority)
-ENV PATH=/app/fuzzer/.venv/bin:/app/seed-gen/.venv/bin:$PATH
+# Set up PATH to include seed-gen and fuzzer venvs
+ENV PATH=/app/seed-gen/.venv/bin:/app/fuzzer/.venv/bin:$PATH
 
 # Copy entrypoint
 COPY oss-crs/bin/buttercup_entrypoint /usr/local/bin/buttercup_entrypoint

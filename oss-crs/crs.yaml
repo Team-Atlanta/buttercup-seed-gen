@@ -30,10 +30,6 @@ crs_run_phase:
     dockerfile: oss-crs/dockerfiles/buttercup-runner.Dockerfile
     additional_env:
       RUN_TYPE: orchestrator
-  fuzzer-bot:
-    dockerfile: oss-crs/dockerfiles/buttercup-runner.Dockerfile
-    additional_env:
-      RUN_TYPE: fuzzer
   coverage-bot:
     dockerfile: oss-crs/dockerfiles/buttercup-runner.Dockerfile
     additional_env:

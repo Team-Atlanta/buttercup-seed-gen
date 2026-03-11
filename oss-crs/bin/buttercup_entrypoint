@@ -48,13 +48,14 @@ if [ "$RUN_TYPE" != "redis" ]; then
         libCRS download-build-output cqdb "$CQDB_DIR" || {
             echo "WARNING: No cqdb build found, seed-gen may not have code analysis"
         }
-        # Extract task_id from task_meta.json for cqdb path
-        if [ -f "$CQDB_DIR"/*.cqdb.tgz ]; then
-            TASK_ID=$(python3 -c "import json; print(json.load(open('$TASK_DIR/task_meta.json'))['task_id'])")
-            # Move tarball to expected location for node_local
-            mkdir -p "$ARTIFACTS_DIR/$TASK_ID"
-            mv "$CQDB_DIR"/*.cqdb.tgz "$ARTIFACTS_DIR/$TASK_ID/${TASK_ID}.cqdb.tgz" 2>/dev/null || true
-            echo "Codequery database available at $ARTIFACTS_DIR/$TASK_ID/${TASK_ID}.cqdb.tgz"
+        # Extract cqdb tarball to task directory so CodeQuery finds it
+        # The tarball contains container_src_dir/ with pre-built codequery indexes
+        if ls "$CQDB_DIR"/*.cqdb.tgz 1>/dev/null 2>&1; then
+            CQDB_TARBALL=$(ls "$CQDB_DIR"/*.cqdb.tgz | head -1)
+            echo "Extracting codequery database from $CQDB_TARBALL to $TASK_DIR..."
+            tar -xzf "$CQDB_TARBALL" -C "$TASK_DIR"
+            echo "Codequery database extracted to $TASK_DIR/container_src_dir"
+            ls -la "$TASK_DIR/container_src_dir" 2>/dev/null || true
         fi
     fi
 fi
@@ -109,24 +110,6 @@ case "$RUN_TYPE" in
         export COVERAGE_DIR="$ARTIFACTS_DIR/coverage"
         export HARNESS_NAME="${OSS_CRS_TARGET_HARNESS:-}"
         exec python /crs/orchestrator.py
-        ;;
-    fuzzer)
-        echo "Starting Fuzzer Bot..."
-        # Register submit directories for POVs and seeds
-        libCRS register-submit-dir pov "$POVS_DIR" --log /tmp/pov_submit.log &
-        libCRS register-submit-dir seed "$CORPUS_DIR" --log /tmp/seed_submit.log &
-
-        # Set up shared directory for corpus
-        libCRS register-shared-dir /shared-corpus corpus || true
-
-        export BUTTERCUP_FUZZER_REDIS_URL="$REDIS_URL"
-        export BUTTERCUP_FUZZER_TIMER=5000
-        export BUTTERCUP_FUZZER_WDIR="$ARTIFACTS_DIR"
-        export BUTTERCUP_FUZZER_CRS_SCRATCH_DIR="$ARTIFACTS_DIR"
-        export BUTTERCUP_FUZZER_RUNNER_PATH="/app/fuzzer_runner/runner.sh"
-        export BUTTERCUP_FUZZER_TIMEOUT=60000
-        export BUTTERCUP_FUZZER_LOG_LEVEL=INFO
-        exec buttercup-fuzzer
         ;;
     coverage)
         echo "Starting Coverage Bot..."
