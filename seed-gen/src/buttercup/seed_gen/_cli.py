@@ -7,10 +7,8 @@ import tempfile
 from pathlib import Path
 
 from buttercup.common.challenge_task import ChallengeTask
-from buttercup.common.datastructures.msg_pb2 import BuildOutput
 from buttercup.common.logger import setup_package_logger
 from buttercup.common.project_yaml import ProjectYaml
-from buttercup.common.reproduce_multiple import ReproduceMultiple
 from buttercup.common.telemetry import init_telemetry
 from buttercup.program_model.codequery import CodeQueryPersistent
 from pydantic_settings import get_subcommand
@@ -22,8 +20,6 @@ from buttercup.seed_gen.seed_explore import SeedExploreTask
 from buttercup.seed_gen.seed_gen_bot import SeedGenBot
 from buttercup.seed_gen.seed_init import SeedInitTask
 from buttercup.seed_gen.task import TaskName
-from buttercup.seed_gen.vuln_discovery_delta import VulnDiscoveryDeltaTask
-from buttercup.seed_gen.vuln_discovery_full import VulnDiscoveryFullTask
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +39,7 @@ def command_server(settings: Settings) -> None:
         settings.server.sleep_time,
         settings.wdir,
         max_corpus_seed_size=settings.server.max_corpus_seed_size,
-        max_pov_size=settings.server.max_pov_size,
         corpus_root=str(settings.server.corpus_root) if settings.server.corpus_root else None,
-        crash_dir_count_limit=settings.server.crash_dir_count_limit,
     )
     seed_gen_bot.run()
 
@@ -96,46 +90,6 @@ def command_process(settings: Settings) -> None:
                 None,
             )
             task.do_task(command.target_function, command.target_function_paths, out_dir)
-        elif command.task_type == TaskName.VULN_DISCOVERY.value:
-            if not command.build_output:
-                raise ValueError("build_outputs required for vuln-discovery task")
-
-            fbuilds = []
-            # can only specify one build output currently
-            build = command.build_output
-            build_output = BuildOutput()
-            build_output.task_dir = build["task_dir"]
-            build_output.build_type = build["build_type"]
-            build_output.engine = build["engine"]
-            build_output.sanitizer = build["sanitizer"]
-            build_output.apply_diff = build["apply_diff"]
-            fbuilds.append(build_output)
-
-            reproduce_multiple = ReproduceMultiple(temp_dir, fbuilds)
-            with reproduce_multiple.open() as mult:
-                if challenge_task.is_delta_mode():
-                    task = VulnDiscoveryDeltaTask(
-                        command.package_name,
-                        command.harness_name,
-                        challenge_task,
-                        codequery,
-                        project_yaml,
-                        None,
-                        mult,
-                        [],  # skipping sarifs for now
-                    )
-                else:
-                    task = VulnDiscoveryFullTask(
-                        command.package_name,
-                        command.harness_name,
-                        challenge_task,
-                        codequery,
-                        project_yaml,
-                        None,
-                        mult,
-                        [],  # skipping sarifs for now
-                    )
-                task.do_task(out_dir, current_dir)
         else:
             raise ValueError(f"Unknown task type: {command.task_type}")
 

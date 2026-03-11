@@ -68,9 +68,8 @@ def test_task_counter_get_all_counts(redis_client):
 
     counter.increment(harness_name, package_name, task_id, TaskName.SEED_INIT.value)
     counter.increment(harness_name, package_name, task_id, TaskName.SEED_INIT.value)
-    counter.increment(harness_name, package_name, task_id, TaskName.VULN_DISCOVERY.value)
+    counter.increment(harness_name, package_name, task_id, TaskName.SEED_EXPLORE.value)
 
     counts = counter.get_all_counts(harness_name, package_name, task_id)
     assert counts[TaskName.SEED_INIT.value] == 2
-    assert counts[TaskName.VULN_DISCOVERY.value] == 1
-    assert counts[TaskName.SEED_EXPLORE.value] == 0
+    assert counts[TaskName.SEED_EXPLORE.value] == 1

@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 class TaskName(str, Enum):
     SEED_INIT = "seed-init"
     SEED_EXPLORE = "seed-explore"
-    VULN_DISCOVERY = "vuln-discovery"
 
 
 class CodeSnippet(BaseModel):
