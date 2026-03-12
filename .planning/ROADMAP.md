@@ -101,10 +101,11 @@ Plans:
   4. JaCoCo CLI generates XML report from .exec file
   5. XML report appears at `<build_dir>/dumps/<harness>.xml`
 
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md — Add java/jvm to crs.yaml and install JaCoCo JARs in Docker image
+- [ ] 04-02-PLAN.md — Add Java coverage support to helper.py with JaCoCo integration
 
 ### Phase 5: Integration & Validation
 **Goal**: Java coverage flows end-to-end from execution to CoverageMap
@@ -134,7 +135,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Service & Configuration Removal | v1.0 | 1/1 | Complete | 2026-03-10 |
 | 2. Code Cleanup | v1.0 | 2/2 | Complete | 2026-03-10 |
 | 3. Validation & Documentation | v1.0 | 3/3 | Complete | 2026-03-11 |
-| 4. Java Coverage Infrastructure | v1.1 | 0/? | Not started | - |
+| 4. Java Coverage Infrastructure | v1.1 | 0/2 | Planned | - |
 | 5. Integration & Validation | v1.1 | 0/? | Not started | - |
 
 ## Coverage Map
