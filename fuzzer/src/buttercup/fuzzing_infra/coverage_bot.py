@@ -43,8 +43,10 @@ class CoverageBot(TaskLoop):
         allow_pull: bool,
         llvm_cov_tool: str,
         sample_size: int,
+        corpus_root: str | None = None,
     ):
         self.wdir = wdir
+        self.corpus_root = corpus_root
         self.python = python
         self.allow_pull = allow_pull
         self.llvm_cov_tool = llvm_cov_tool
@@ -121,8 +123,12 @@ class CoverageBot(TaskLoop):
 
         tsk = ChallengeTask(read_only_task_dir=coverage_build.task_dir)
         with tsk.get_rw_copy(work_dir=Path(self.wdir)) as local_tsk:
-            corpus = Corpus(self.wdir, task.task_id, task.harness_name)
-            corpus.sync_from_remote()
+            # Use corpus_root if provided (OSS-CRS mode), otherwise fall back to wdir
+            corpus_base = self.corpus_root if self.corpus_root else self.wdir
+            oss_crs_mode = self.corpus_root is not None
+            corpus = Corpus(corpus_base, task.task_id, task.harness_name, oss_crs_mode=oss_crs_mode)
+            if not oss_crs_mode:
+                corpus.sync_from_remote()
 
             # Use the sampled corpus for coverage analysis
             with self._sample_corpus(corpus) as (sampled_corpus_path, remaining_files):
@@ -234,6 +240,7 @@ def main() -> None:
         args.allow_pull,
         args.llvm_cov_tool,
         args.sample_size,
+        corpus_root=args.corpus_root,
     )
     fuzzer.run()
 

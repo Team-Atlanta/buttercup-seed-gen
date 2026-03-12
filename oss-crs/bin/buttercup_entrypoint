@@ -16,7 +16,8 @@ TASK_DIR="$ARTIFACTS_DIR/task"
 CORPUS_DIR="$ARTIFACTS_DIR/corpus"
 POVS_DIR="$ARTIFACTS_DIR/povs"
 
-mkdir -p "$CORPUS_DIR" "$POVS_DIR"
+# Only create POVS_DIR, CORPUS_DIR will be created via register-shared-dir
+mkdir -p "$POVS_DIR"
 
 # Download build outputs from libCRS (except for redis)
 if [ "$RUN_TYPE" != "redis" ]; then
@@ -113,16 +114,26 @@ case "$RUN_TYPE" in
         ;;
     coverage)
         echo "Starting Coverage Bot..."
+        # Register shared corpus directory for cross-container access
+        libCRS register-shared-dir "$CORPUS_DIR" corpus || {
+            echo "WARNING: Failed to register shared corpus directory"
+        }
+
         export BUTTERCUP_FUZZER_REDIS_URL="$REDIS_URL"
         export BUTTERCUP_FUZZER_TIMER=30000
         export BUTTERCUP_FUZZER_WDIR="$ARTIFACTS_DIR"
+        export BUTTERCUP_FUZZER_CORPUS_ROOT="$CORPUS_DIR"
         export BUTTERCUP_FUZZER_ALLOW_PULL=false
         export BUTTERCUP_FUZZER_LOG_LEVEL=INFO
         exec buttercup-coverage-bot
         ;;
     seedgen)
         echo "Starting Seed-Gen..."
-        # Seeds are submitted via libCRS submit in seed_gen_bot.py after generation
+        # Register shared corpus directory for cross-container access
+        libCRS register-shared-dir "$CORPUS_DIR" corpus || {
+            echo "WARNING: Failed to register shared corpus directory"
+        }
+        # Seeds are also submitted via libCRS submit in seed_gen_bot.py after generation
 
         export BUTTERCUP_SEED_GEN_SERVER__REDIS_URL="$REDIS_URL"
         export BUTTERCUP_SEED_GEN_SERVER__SLEEP_TIME=10

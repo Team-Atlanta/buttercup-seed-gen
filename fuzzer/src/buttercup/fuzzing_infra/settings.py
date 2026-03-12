@@ -44,6 +44,7 @@ class FuzzerBotSettings(WorkerSettings):
 class CoverageBotSettings(WorkerSettings, BuilderSettings):
     llvm_cov_tool: Annotated[str, Field(default="llvm-cov")]
     sample_size: Annotated[int, Field(default=0)]
+    corpus_root: Annotated[str | None, Field(default=None)]
 
 
 class BuilderBotSettings(WorkerSettings, BuilderSettings):
