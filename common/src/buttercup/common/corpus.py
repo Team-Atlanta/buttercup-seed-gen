@@ -220,10 +220,21 @@ class CrashDir:
 
 
 class Corpus(InputDir):
-    def __init__(self, wdir: str, task_id: str, harness_name: str, copy_corpus_max_size: int | None = None):
+    def __init__(
+        self,
+        wdir: str,
+        task_id: str,
+        harness_name: str,
+        copy_corpus_max_size: int | None = None,
+        oss_crs_mode: bool = False,
+    ):
         self.task_id = task_id
         self.harness_name = harness_name
-        self.corpus_dir = os.path.join(task_id, f"{CORPUS_DIR_NAME}_{harness_name}")
+        if oss_crs_mode:
+            # OSS-CRS expects: <corpus_root>/<harness_name>/seeds/
+            self.corpus_dir = os.path.join(harness_name, "seeds")
+        else:
+            self.corpus_dir = os.path.join(task_id, f"{CORPUS_DIR_NAME}_{harness_name}")
         super().__init__(wdir, self.corpus_dir, copy_corpus_max_size=copy_corpus_max_size)
 
     def remove_any_merged(self, redis: Redis) -> None:

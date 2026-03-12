@@ -122,8 +122,7 @@ case "$RUN_TYPE" in
         ;;
     seedgen)
         echo "Starting Seed-Gen..."
-        # Register submit directories for seeds
-        libCRS register-submit-dir seed "$CORPUS_DIR" --log /tmp/seed_submit.log &
+        # Seeds are submitted via libCRS submit in seed_gen_bot.py after generation
 
         export BUTTERCUP_SEED_GEN_SERVER__REDIS_URL="$REDIS_URL"
         export BUTTERCUP_SEED_GEN_SERVER__SLEEP_TIME=10

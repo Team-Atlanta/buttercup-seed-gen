@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -124,12 +125,15 @@ class SeedGenBot(TaskLoop):
                 return
 
             # Use corpus_root if provided, otherwise fall back to wdir
+            # When corpus_root is set, use OSS-CRS directory structure for libCRS compatibility
             corpus_base = self.corpus_root if self.corpus_root else self.wdir.as_posix()
+            oss_crs_mode = self.corpus_root is not None
             corp = Corpus(
                 corpus_base,
                 task.task_id,
                 task.harness_name,
                 copy_corpus_max_size=self.max_corpus_seed_size,
+                oss_crs_mode=oss_crs_mode,
             )
             override_task = os.getenv("BUTTERCUP_SEED_GEN_TEST_TASK")
             if override_task:
@@ -183,6 +187,26 @@ class SeedGenBot(TaskLoop):
 
             copied_files = corp.copy_corpus(str(out_dir))
             logger.info("Copied %d files to corpus %s", len(copied_files), corp.corpus_dir)
+
+            # In OSS-CRS mode, submit files via libCRS
+            if oss_crs_mode and copied_files:
+                for seed_file in copied_files:
+                    try:
+                        result = subprocess.run(
+                            ["libCRS", "submit", "seed", seed_file],
+                            capture_output=True,
+                            text=True,
+                            timeout=30,
+                        )
+                        if result.returncode != 0:
+                            logger.warning("libCRS submit failed for %s: %s", seed_file, result.stderr)
+                    except FileNotFoundError:
+                        logger.debug("libCRS not available, skipping submit")
+                        break
+                    except subprocess.TimeoutExpired:
+                        logger.warning("libCRS submit timed out for %s", seed_file)
+                logger.info("Submitted %d seeds via libCRS", len(copied_files))
+
             logger.info(
                 f"Seed-gen finished for {task.harness_name} | {task.package_name} | {task.task_id}",
             )
