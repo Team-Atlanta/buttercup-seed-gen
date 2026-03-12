@@ -2,32 +2,45 @@
 
 ## What This Is
 
-A slimmed-down version of Buttercup's oss-crs that focuses solely on seed generation. Instead of the full fuzzing pipeline (seedgen → fuzzer → POV), this tool generates seeds and submits them directly to the competition API via `libcrs register-submit-dir seed`.
+A slimmed-down version of Buttercup's oss-crs that focuses solely on seed generation. Instead of the full fuzzing pipeline (seedgen → fuzzer → POV), this tool generates seeds and submits them directly to the competition API via `libcrs register-submit-dir seed`. Supports both C/C++ and Java targets.
 
 ## Core Value
 
 Generate quality seeds and submit them to the competition API without the overhead of fuzzing infrastructure.
 
+## Current Milestone: v1.1 Java Support
+
+**Goal:** Add full Java/Jazzer support to seed-gen standalone, including JaCoCo coverage integration.
+
+**Target features:**
+- Java language declared in crs.yaml supported_target
+- JaCoCo coverage execution in builder-coverage.sh helper.py
+- Coverage-bot parses JaCoCo XML for Java targets
+
 ## Requirements
 
 ### Validated
 
-<!-- Existing capabilities that work and we're keeping -->
+<!-- Shipped and confirmed working -->
 
-- ✓ Seedgen generates targeted seed inputs based on code analysis — existing
-- ✓ Coverage-bot monitors and reports coverage metrics — existing
-- ✓ Redis-based queue communication between components — existing
-- ✓ Orchestrator populates Redis with build artifacts — existing
-- ✓ OSS-CRS docker build/run infrastructure — existing
+- ✓ Seedgen generates targeted seed inputs based on code analysis — v1.0
+- ✓ Coverage-bot monitors and reports coverage metrics — v1.0
+- ✓ Redis-based queue communication between components — v1.0
+- ✓ Orchestrator populates Redis with build artifacts — v1.0
+- ✓ OSS-CRS docker build/run infrastructure — v1.0
+- ✓ Fuzzer-bot removed, 4-service architecture — v1.0
+- ✓ Seed-only task distribution (SEED_INIT, SEED_EXPLORE) — v1.0
+- ✓ No POV/crash infrastructure — v1.0
+- ✓ Seeds submitted via libCRS register-submit-dir — v1.0
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] Remove fuzzer-bot from oss-crs services (crs.yaml)
-- [ ] Seedgen submits seeds directly to `libcrs register-submit-dir seed` directory
-- [ ] Remove POV submission path (no longer needed without fuzzer)
-- [ ] Verify slimmed services deploy and run successfully
+- [ ] Add java/jvm to crs.yaml supported_target.language
+- [ ] Add JaCoCo coverage execution to builder-coverage.sh helper.py
+- [ ] Ensure JaCoCo JARs available in coverage builder image
+- [ ] Verify Java coverage-bot integration with existing CoverageRunner.run_java()
 
 ### Out of Scope
 
@@ -35,6 +48,7 @@ Generate quality seeds and submit them to the competition API without the overhe
 - Triaging/TracerBot — not needed without crash analysis
 - Patcher — no vulnerabilities to patch without fuzzer
 - Full Buttercup CRS deployment — this is oss-crs only
+- Go/Python/JavaScript coverage — focus on C/C++ and Java only
 
 ## Context
 
@@ -62,9 +76,10 @@ The `libcrs` CLI is the standard interface for submitting artifacts to the compe
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Keep coverage-bot | Still useful for seed quality metrics | — Pending |
-| Keep orchestrator | Required to populate Redis for seedgen task discovery | — Pending |
-| Direct libcrs submission | Simplest path, matches competition API expectations | — Pending |
+| Keep coverage-bot | Still useful for seed quality metrics | ✓ Good |
+| Keep orchestrator | Required to populate Redis for seedgen task discovery | ✓ Good |
+| Direct libcrs submission | Simplest path, matches competition API expectations | ✓ Good |
+| Imitate OSS-Fuzz helper.py for Java coverage | Consistent with upstream, uses JaCoCo agent + CLI | — Pending |
 
 ---
-*Last updated: 2026-03-10 after initialization*
+*Last updated: 2026-03-12 after v1.1 milestone start*

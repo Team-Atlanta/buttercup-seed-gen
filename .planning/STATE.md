@@ -1,59 +1,61 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-current_phase: 3
-status: executing
-last_updated: "2026-03-11T05:45:52.430Z"
+milestone: v1.1
+milestone_name: java-support
+current_phase: 0
+status: defining
+last_updated: "2026-03-12T00:00:00.000Z"
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State: Buttercup Seed-Gen Standalone
 
-**Last Updated:** 2026-03-11
-**Current Phase:** 3
-**Status:** In progress
+**Last Updated:** 2026-03-12
+**Current Phase:** —
+**Status:** Defining requirements
 
 ## Project Reference
 
 **Core Value**: Generate quality seeds and submit them to competition API without fuzzing overhead
 
-**Current Focus**: Extract seed-gen as standalone service from OSS-CRS by removing fuzzer-bot and POV infrastructure
+**Current Focus**: Add Java/Jazzer support with JaCoCo coverage integration
 
-**Key Constraint**: Must use `libcrs register-submit-dir seed` for competition API submission
+**Key Constraint**: Imitate OSS-Fuzz helper.py patterns for Java coverage execution
 
 ## Current Position
 
-**Phase**: 03 - Validation & Documentation
-**Plan**: 03-03 complete (3/3 plans)
-**Task**: N/A (phase complete)
-**Status**: Phase 03 complete
+**Phase**: Not started (defining requirements)
+**Plan**: —
+**Task**: —
+**Status**: Defining requirements
 
-**Progress**: `[██████████] 3/3 phases (100%)`
+**Progress**: `[░░░░░░░░░░] 0/0 phases (—)`
 
 ## Performance Metrics
 
-**Velocity**:
+**v1.0 Final**:
 - Plans completed: 6
 - Tasks completed: 17
 - Phases completed: 3/3
+- Requirements: 15/15 mapped (100%)
 
-**Quality**:
-- Tests passing: All relevant tests pass (new test suite added for seed_gen_bot)
-- Blockers: None
-- Critical issues: None
-
-**Coverage**:
-- Requirements mapped: 15/15 (100%)
-- Requirements completed: 11/15 (73%)
+**v1.1 Current**:
+- Phases planned: 0
+- Requirements defined: Pending
 
 ## Accumulated Context
 
 ### Recent Decisions
+
+**2026-03-12**: Started v1.1 Java Support milestone
+- Java support already exists in codebase: find_jazzer_harnesses(), Language.JAVA, CodeQuery JAVA_EXTENSIONS
+- CoverageRunner.run_java() parses JaCoCo XML — already implemented
+- Gap is in oss-crs deployment: crs.yaml only declares C/C++, builder-coverage.sh only handles LLVM coverage
+- Will imitate OSS-Fuzz helper.py run_java_fuzz_target() for JaCoCo integration
 
 **2026-03-11**: Completed Phase 03 Plan 03 - Standalone architecture documentation
 - Created 305-line oss-crs/README.md documenting 4-service architecture
@@ -141,54 +143,44 @@ None identified
 
 ### For Next Session
 
-**All phases complete!**
+**v1.1 Java Support milestone started — defining requirements**
 
-Project milestone v1.0 complete:
-- Phase 01: Service & Configuration Removal (1 plan)
-- Phase 02: Code Cleanup (2 plans)
-- Phase 03: Validation & Documentation (3 plans)
+**Context gathered:**
+- Harness is provided via OSS_CRS_TARGET_HARNESS (not discovered)
+- OSS-Fuzz helper.py has run_java_fuzz_target() that uses JaCoCo agent + CLI
+- JaCoCo produces .exec files → converted to XML → parsed by CoverageRunner.run_java()
+- builder-coverage.sh helper.py needs Java coverage branch
 
-**Key deliverables:**
-- 4-service standalone architecture (fuzzer-bot removed)
-- Seed-only task distribution (SEED_INIT 5%, SEED_EXPLORE 95%)
-- No POV/crash infrastructure
-- Comprehensive README.md documentation
-
-**Next steps:**
-- Run `/gsd:verify-work` for final verification
-- Consider integration test with crs-compose (manual, documented in 03-02-PLAN.md)
+**Key references:**
+- ~/post/oss-fuzz/infra/base-images/base-runner/coverage (lines 189-229 for Java)
+- ~/post/oss-fuzz/infra/base-images/base-runner/jacoco_report_converter.py
 
 **If context is lost**:
-- Read: `.planning/ROADMAP.md` for phase structure
-- Read: `.planning/REQUIREMENTS.md` for requirement details
-- Read: `oss-crs/README.md` for deployment documentation
+- Read: `.planning/PROJECT.md` for milestone goals
+- Read: `.planning/REQUIREMENTS.md` for requirements (once created)
+- Read: `java-support.md` at repo root for existing Java support documentation
 
 ### Key Files
 
-- `/home/andrew/post/buttercup-bugfind/.planning/PROJECT.md` - Core value and constraints
-- `/home/andrew/post/buttercup-bugfind/.planning/REQUIREMENTS.md` - 15 v1 requirements with traceability
-- `/home/andrew/post/buttercup-bugfind/.planning/ROADMAP.md` - 3-phase delivery structure
-- `/home/andrew/post/buttercup-bugfind/.planning/research/SUMMARY.md` - Technical research findings
-- `/home/andrew/post/buttercup-bugfind/.planning/config.json` - Workflow configuration
+- `.planning/PROJECT.md` - Core value and milestone goals
+- `.planning/REQUIREMENTS.md` - Requirements with traceability (to be created)
+- `.planning/ROADMAP.md` - Phase structure (v1.0 complete, v1.1 pending)
+- `oss-crs/bin/builder-coverage.sh` - Main file to modify for Java coverage
+- `fuzzer/src/buttercup/fuzzing_infra/coverage_runner.py` - CoverageRunner.run_java() already exists
 
 ### Command Shortcuts
 
 ```bash
-# View roadmap
-cat .planning/ROADMAP.md
+# View project goals
+cat .planning/PROJECT.md
 
 # View current state
 cat .planning/STATE.md
 
-# View requirements
-cat .planning/REQUIREMENTS.md
-
-# Start phase planning
-/gsd:plan-phase 1
-
-# View research context
-cat .planning/research/SUMMARY.md
+# After requirements defined
+/gsd:plan-phase 4
 ```
 
 ---
 *State initialized: 2026-03-10*
+*Milestone v1.1 started: 2026-03-12*
