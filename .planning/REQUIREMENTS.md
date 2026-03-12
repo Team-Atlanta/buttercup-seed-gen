@@ -3,7 +3,33 @@
 **Defined:** 2026-03-10
 **Core Value:** Generate quality seeds and submit them to the competition API without fuzzing overhead
 
-## v1 Requirements
+## v1.1 Requirements
+
+Requirements for Java/Jazzer support with JaCoCo coverage integration.
+
+### Configuration
+
+- [ ] **CFG-01**: crs.yaml declares `java` and `jvm` in `supported_target.language`
+- [ ] **CFG-02**: helper.py detects language from project.yaml
+
+### Coverage Infrastructure
+
+- [ ] **COV-01**: JaCoCo agent runs Jazzer target with `--additional_jvm_args=-javaagent:/opt/jacoco-agent.jar=...`
+- [ ] **COV-02**: JaCoCo CLI generates XML report from .exec file via `java -jar /opt/jacoco-cli.jar report`
+- [ ] **COV-03**: XML report placed at `<build_dir>/dumps/<harness>.xml` (CoverageRunner.run_java() expected path)
+- [ ] **COV-04**: JaCoCo JARs (`jacoco-agent.jar`, `jacoco-cli.jar`) available in coverage builder image
+
+### Integration
+
+- [ ] **INT-01**: helper.py dispatches to Java coverage vs C coverage based on detected language
+- [ ] **INT-02**: CoverageRunner.run_java() successfully parses generated JaCoCo XML
+
+### Validation
+
+- [ ] **VAL-04**: Java target coverage execution succeeds in oss-crs deployment
+- [ ] **VAL-05**: coverage-bot populates CoverageMap for Java harness
+
+## v1.0 Requirements (Complete)
 
 Requirements for slimmed-down oss-crs seed generator.
 
@@ -34,7 +60,7 @@ Requirements for slimmed-down oss-crs seed generator.
 - [x] **VAL-02**: Seedgen generates and submits seeds via libCRS
 - [x] **VAL-03**: Coverage-bot runs without fuzzer-bot dependency
 
-## v2 Requirements
+## Future Requirements
 
 Deferred to future work.
 
@@ -42,6 +68,11 @@ Deferred to future work.
 
 - **OPT-01**: Further slim Docker image by removing unused Python dependencies
 - **OPT-02**: Add seed quality metrics/dashboard
+
+### Additional Languages
+
+- **LANG-01**: Go coverage support
+- **LANG-02**: Python coverage support
 
 ## Out of Scope
 
@@ -52,10 +83,33 @@ Deferred to future work.
 | Patcher integration | No vulnerabilities to patch without fuzzer |
 | Full Buttercup CRS features | This is oss-crs only, not full deployment |
 | Protobuf enum cleanup | BuildType.FUZZER must remain (seedgen references it for build lookup) |
+| Go/Python/JS coverage | Focus on C/C++ and Java only for OSS-CRS |
 
 ## Traceability
 
 Which phases cover which requirements. Updated during roadmap creation.
+
+### v1.1 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| CFG-01 | — | Pending |
+| CFG-02 | — | Pending |
+| COV-01 | — | Pending |
+| COV-02 | — | Pending |
+| COV-03 | — | Pending |
+| COV-04 | — | Pending |
+| INT-01 | — | Pending |
+| INT-02 | — | Pending |
+| VAL-04 | — | Pending |
+| VAL-05 | — | Pending |
+
+**v1.1 Coverage:**
+- v1.1 requirements: 10 total
+- Mapped to phases: 0
+- Unmapped: 10 (pending roadmap)
+
+### v1.0 Traceability (Complete)
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -75,11 +129,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VAL-02 | Phase 3 | Complete |
 | VAL-03 | Phase 3 | Complete |
 
-**Coverage:**
-- v1 requirements: 15 total
+**v1.0 Coverage:**
+- v1.0 requirements: 15 total
 - Mapped to phases: 15
-- Unmapped: 0
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-10*
-*Last updated: 2026-03-12 — all validation requirements complete*
+*Last updated: 2026-03-12 — v1.1 Java support requirements added*
