@@ -81,7 +81,19 @@ import os
 import subprocess
 import sys
 import tempfile
+import yaml
 from pathlib import Path
+
+
+def get_project_language(project_name: str) -> str:
+    """Detect language from project.yaml, default to 'c'."""
+    helper_dir = Path(__file__).parent.parent  # oss-fuzz/
+    project_yaml = helper_dir / "projects" / project_name / "project.yaml"
+    if project_yaml.exists():
+        with open(project_yaml) as f:
+            config = yaml.safe_load(f)
+            return config.get("language", "c").lower()
+    return "c"
 
 
 def run_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
