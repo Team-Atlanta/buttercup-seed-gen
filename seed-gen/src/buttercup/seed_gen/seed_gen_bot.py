@@ -123,8 +123,10 @@ class SeedGenBot(TaskLoop):
                 logger.exception(f"Failed to initialize codequery: {e}.")
                 return
 
+            # Use corpus_root if provided, otherwise fall back to wdir
+            corpus_base = self.corpus_root if self.corpus_root else self.wdir.as_posix()
             corp = Corpus(
-                self.wdir.as_posix(),
+                corpus_base,
                 task.task_id,
                 task.harness_name,
                 copy_corpus_max_size=self.max_corpus_seed_size,
