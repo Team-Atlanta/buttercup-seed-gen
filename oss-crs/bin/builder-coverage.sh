@@ -96,6 +96,65 @@ def get_project_language(project_name: str) -> str:
     return "c"
 
 
+def run_java_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
+                      build_dir: Path, no_serve: bool = True) -> int:
+    """Run Java coverage using JaCoCo agent and CLI."""
+    harness_path = build_dir / fuzz_target
+    corpus_path = Path(corpus_dir)
+
+    if not corpus_path.exists() or not list(corpus_path.iterdir()):
+        print(f"Warning: No corpus files in {corpus_dir}", file=sys.stderr)
+        return 0
+
+    dumps_dir = build_dir / "dumps"
+    dumps_dir.mkdir(parents=True, exist_ok=True)
+
+    # JaCoCo output paths
+    exec_file = dumps_dir / f"{fuzz_target}.exec"
+    class_dump_dir = dumps_dir / "classes"
+    class_dump_dir.mkdir(parents=True, exist_ok=True)
+    xml_report = dumps_dir / f"{fuzz_target}.xml"
+
+    # JaCoCo agent arguments (imitate OSS-Fuzz pattern)
+    jacoco_args = f"destfile={exec_file},classdumpdir={class_dump_dir},excludes=com.code_intelligence.jazzer.*"
+
+    # Run Jazzer with JaCoCo agent against corpus
+    # Use -merge=1 to process all corpus files in one run
+    jazzer_cmd = [
+        str(harness_path),
+        "-merge=1",
+        "-timeout=100",
+        "--nohooks",
+        f"--additional_jvm_args=-javaagent:/opt/jacoco-agent.jar={jacoco_args}",
+        str(corpus_path),
+    ]
+
+    print(f"Running Jazzer with JaCoCo: {' '.join(jazzer_cmd)}", file=sys.stderr)
+    result = subprocess.run(jazzer_cmd, capture_output=True, text=True)
+
+    if not exec_file.exists():
+        print(f"Error: JaCoCo exec file not created at {exec_file}", file=sys.stderr)
+        return 1
+
+    # Generate XML report using JaCoCo CLI
+    cli_cmd = [
+        "java", "-jar", "/opt/jacoco-cli.jar",
+        "report", str(exec_file),
+        "--xml", str(xml_report),
+        "--classfiles", str(class_dump_dir),
+    ]
+
+    print(f"Generating XML report: {' '.join(cli_cmd)}", file=sys.stderr)
+    result = subprocess.run(cli_cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        print(f"Error generating XML report: {result.stderr}", file=sys.stderr)
+        return 1
+
+    print(f"Coverage XML written to {xml_report}", file=sys.stderr)
+    return 0
+
+
 def run_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
                  build_dir: Path, no_serve: bool = True) -> int:
     """Run coverage analysis on the given fuzz target."""
