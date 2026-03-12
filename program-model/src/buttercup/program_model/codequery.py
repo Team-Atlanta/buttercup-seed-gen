@@ -318,6 +318,22 @@ class CodeQuery:
         container_src_dir_idx = path.parts.index(CONTAINER_SRC_DIR)
         return Path("/", *path.parts[container_src_dir_idx + 1 :])
 
+    def _to_codequery_path(self, path: Path) -> Path:
+        """Convert an external path (e.g., /src/...) to codequery-compatible format (./src/...).
+
+        Codequery stores paths relative to container_src_dir with a './' prefix.
+        Coverage data and other external sources provide paths like '/src/...'.
+        This method converts them to the format cqsearch expects.
+        """
+        path_str = path.as_posix()
+        # Convert absolute /src/... paths to relative ./src/...
+        if path_str.startswith("/src/"):
+            return Path("." + path_str)
+        # Handle paths that are already relative but start with src/
+        if path_str.startswith("src/"):
+            return Path("./" + path_str)
+        return path
+
     def _rebase_functions_file_paths(self, functions: list[Function]) -> list[Function]:
         """Rebase the file paths of the functions to the challenge task container structure."""
         return [
@@ -400,7 +416,8 @@ class CodeQuery:
                 "-u",
             ]
             if file_path:
-                cqsearch_args += ["-b", file_path.as_posix()]
+                cq_path = self._to_codequery_path(file_path)
+                cqsearch_args += ["-b", cq_path.as_posix()]
 
             # log telemetry
             tracer = trace.get_tracer(__name__)
@@ -607,7 +624,8 @@ class CodeQuery:
             # path to cqsearch args because (by definition) the callees are called in
             # the same file as the function.
             if file_path:
-                cqsearch_args += ["-b", file_path.as_posix()]
+                cq_path = self._to_codequery_path(file_path)
+                cqsearch_args += ["-b", cq_path.as_posix()]
 
             # log telemetry
             tracer = trace.get_tracer(__name__)
@@ -718,7 +736,8 @@ class CodeQuery:
                 "-u",
             ]
             if file_path:
-                cqsearch_args += ["-b", file_path.as_posix()]
+                cq_path = self._to_codequery_path(file_path)
+                cqsearch_args += ["-b", cq_path.as_posix()]
 
             # log telemetry
             tracer = trace.get_tracer(__name__)

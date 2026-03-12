@@ -371,7 +371,7 @@ class CoverageRunner:
 
     def run_java(self, harness_name: str, corpus_dir: str) -> list[CoveredFunction] | None:
         ret = self.tool.run_coverage(harness_name, corpus_dir)
-        if not ret:
+        if not ret.success:
             logger.error(f"Failed to run coverage for {harness_name} | {corpus_dir} | {self.tool.project_name}")
             return None
 
@@ -424,7 +424,7 @@ class CoverageRunner:
 
     def run_c(self, harness_name: str, corpus_dir: str) -> list[CoveredFunction] | None:
         ret = self.tool.run_coverage(harness_name, corpus_dir)
-        if not ret:
+        if not ret.success:
             logger.error(f"Failed to run coverage for {harness_name} | {corpus_dir} | {self.tool.project_name}")
             return None
 
