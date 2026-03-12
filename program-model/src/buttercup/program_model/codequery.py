@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import shutil
 import subprocess
+import tarfile
 import uuid
 from dataclasses import dataclass, field
 from itertools import groupby
@@ -33,6 +34,8 @@ logger = logging.getLogger(__name__)
 
 
 CONTAINER_SRC_DIR: str = "container_src_dir"
+OSS_CRS_CQDB_TARBALL: str = "oss-crs-task.cqdb.tgz"
+OSS_CRS_CQDB_DIR: str = "cqdb"
 
 # C/C++ Projects
 C_CPP_EXTENSIONS = [
@@ -195,6 +198,40 @@ class CodeQuery:
         """Get the container source directory."""
         return Path(self.challenge.task_dir.joinpath(CONTAINER_SRC_DIR))
 
+    def _get_oss_crs_cqdb_tarball(self) -> Path | None:
+        """Get the path to the oss-crs pre-built cqdb tarball if it exists.
+
+        oss-crs/libcrs builds the codequery database and packages it at:
+        BUILD_OUT_DIR/cqdb/oss-crs-task.cqdb.tgz
+
+        The task_dir points to BUILD_OUT_DIR/task/, so the tarball is at:
+        task_dir.parent / "cqdb" / "oss-crs-task.cqdb.tgz"
+        """
+        tarball_path = self.challenge.task_dir.parent / OSS_CRS_CQDB_DIR / OSS_CRS_CQDB_TARBALL
+        if tarball_path.exists():
+            return tarball_path
+        return None
+
+    def _extract_oss_crs_cqdb(self) -> bool:
+        """Extract the oss-crs pre-built cqdb tarball if available.
+
+        Returns True if extraction was successful, False if tarball doesn't exist.
+        """
+        tarball_path = self._get_oss_crs_cqdb_tarball()
+        if tarball_path is None:
+            logger.debug("No oss-crs cqdb tarball found at expected location")
+            return False
+
+        logger.info("Extracting oss-crs pre-built cqdb from %s", tarball_path)
+        try:
+            with tarfile.open(tarball_path, "r:gz") as tar:
+                tar.extractall(path=self.challenge.task_dir)
+            logger.info("Successfully extracted oss-crs cqdb to %s", self.challenge.task_dir)
+            return True
+        except Exception as e:
+            logger.error("Failed to extract oss-crs cqdb tarball: %s", e)
+            return False
+
     def _copy_src_from_container(self) -> None:
         """Build and copy the /src directory from the container to the challenge task directory."""
         container_name = self.challenge.task_meta.task_id + "_" + str(uuid.uuid4())[:16]
@@ -224,7 +261,20 @@ class CodeQuery:
             subprocess.run(command, check=True, capture_output=True)
 
     def _create_codequery_db(self) -> None:
-        """Create the codequery database."""
+        """Create the codequery database.
+
+        First tries to extract a pre-built cqdb from oss-crs/libcrs if available.
+        Falls back to building from source via docker cp if no pre-built cqdb exists.
+        """
+        # Try to use oss-crs pre-built cqdb first
+        if self._extract_oss_crs_cqdb():
+            # Verify the extraction provided all necessary files
+            if self._is_already_indexed():
+                logger.info("Using oss-crs pre-built codequery database")
+                return
+            logger.warning("oss-crs cqdb extracted but missing some files, rebuilding from source")
+
+        # Fall back to building from source via docker cp
         self._copy_src_from_container()
 
         with self._get_container_src_dir().joinpath(self.CSCOPE_FILES).open("w") as f:
@@ -297,17 +347,19 @@ class CodeQuery:
 
     def _run_cqsearch(self, *args: str) -> list[CQSearchResult]:
         """Run the cqsearch command and parse the results."""
-        try:
-            result = subprocess.run(
-                ["cqsearch", *args],
-                cwd=self._get_container_src_dir(),
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            output = result.stdout
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to run cqsearch: {e}")
+        result = subprocess.run(
+            ["cqsearch", *args],
+            cwd=self._get_container_src_dir(),
+            capture_output=True,
+            text=True,
+        )
+        # cqsearch returns exit code 1 when no results are found, which is not an error
+        if result.returncode == 1 and not result.stdout.strip():
+            logger.debug("cqsearch returned no results for: %s", " ".join(args))
+            return []
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to run cqsearch: exit code {result.returncode}, stderr: {result.stderr}")
+        output = result.stdout
 
         results = [CQSearchResult.from_line(line) for line in output.splitlines()]
         return [result for result in results if result is not None]
@@ -415,9 +467,8 @@ class CodeQuery:
                 "-e",
                 "-u",
             ]
-            if file_path:
-                cq_path = self._to_codequery_path(file_path)
-                cqsearch_args += ["-b", cq_path.as_posix()]
+            # Note: -b flag removed as standard codequery doesn't support it
+            # File path filtering is done in Python after getting results
 
             # log telemetry
             tracer = trace.get_tracer(__name__)
@@ -434,7 +485,12 @@ class CodeQuery:
                         "crs.action.code.function_name": function_name,
                     },
                 )
-                results.extend(self._run_cqsearch(*cqsearch_args))
+                cqsearch_results = self._run_cqsearch(*cqsearch_args)
+                # Filter by file path if specified (replaces -b flag)
+                if file_path:
+                    cq_path = self._to_codequery_path(file_path)
+                    cqsearch_results = [r for r in cqsearch_results if cq_path.as_posix() in r.file.as_posix()]
+                results.extend(cqsearch_results)
                 span.set_status(Status(StatusCode.OK))
 
         # Extended fuzzy matching
@@ -620,12 +676,9 @@ class CodeQuery:
                 "-u",
             ]
             # NOTE: Querying for callees returns the file path and line number of where
-            # the callees are called, not the callee function definition. We add a file
-            # path to cqsearch args because (by definition) the callees are called in
-            # the same file as the function.
-            if file_path:
-                cq_path = self._to_codequery_path(file_path)
-                cqsearch_args += ["-b", cq_path.as_posix()]
+            # the callees are called, not the callee function definition. We filter by file
+            # path because (by definition) the callees are called in the same file as the function.
+            # Note: -b flag removed as standard codequery doesn't support it
 
             # log telemetry
             tracer = trace.get_tracer(__name__)
@@ -641,7 +694,12 @@ class CodeQuery:
                         "crs.action.code.function_name": function_name,
                     },
                 )
-                results.extend(self._run_cqsearch(*cqsearch_args))
+                cqsearch_results = self._run_cqsearch(*cqsearch_args)
+                # Filter by file path if specified (replaces -b flag)
+                if file_path:
+                    cq_path = self._to_codequery_path(file_path)
+                    cqsearch_results = [r for r in cqsearch_results if cq_path.as_posix() in r.file.as_posix()]
+                results.extend(cqsearch_results)
                 span.set_status(Status(StatusCode.OK))
 
         # Create a dictionary of file path(s) and line ranges to filter callees by.
@@ -735,9 +793,7 @@ class CodeQuery:
                 "-e",
                 "-u",
             ]
-            if file_path:
-                cq_path = self._to_codequery_path(file_path)
-                cqsearch_args += ["-b", cq_path.as_posix()]
+            # Note: -b flag removed as standard codequery doesn't support it
 
             # log telemetry
             tracer = trace.get_tracer(__name__)
@@ -754,7 +810,12 @@ class CodeQuery:
                         "crs.action.code.function_name": function_name if function_name else "",
                     },
                 )
-                results.extend(self._run_cqsearch(*cqsearch_args))
+                cqsearch_results = self._run_cqsearch(*cqsearch_args)
+                # Filter by file path if specified (replaces -b flag)
+                if file_path:
+                    cq_path = self._to_codequery_path(file_path)
+                    cqsearch_results = [r for r in cqsearch_results if cq_path.as_posix() in r.file.as_posix()]
+                results.extend(cqsearch_results)
                 span.set_status(Status(StatusCode.OK))
 
         # Extended fuzzy matching
