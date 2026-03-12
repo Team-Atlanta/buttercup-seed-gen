@@ -237,8 +237,15 @@ class Task:
                 ("human", user_prompt),
             ],
         )
-        chain = prompt | self.llm | extract_code
-        generated_functions = chain.invoke(prompt_vars)
+        # Separate the LLM call from parsing for better error messages
+        llm_chain = prompt | self.llm
+        raw_response = llm_chain.invoke(prompt_vars)
+        logger.debug("LLM response type: %s", type(raw_response))
+        if hasattr(raw_response, "content"):
+            content_type = type(raw_response.content)
+            content_len = len(raw_response.content) if hasattr(raw_response.content, "__len__") else "N/A"
+            logger.debug("LLM response content type: %s, length: %s", content_type, content_len)
+        generated_functions = extract_code(raw_response)
         return generated_functions
 
     def _get_context_base(

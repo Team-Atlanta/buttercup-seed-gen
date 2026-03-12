@@ -1,10 +1,12 @@
 """Tests for seed_gen_bot task sampling"""
 
+from unittest.mock import MagicMock, Mock
+
 import pytest
 from buttercup.common.datastructures.msg_pb2 import WeightedHarness
+
 from buttercup.seed_gen.seed_gen_bot import SeedGenBot
 from buttercup.seed_gen.task import TaskName
-from unittest.mock import MagicMock, Mock
 
 
 @pytest.fixture
@@ -57,23 +59,17 @@ class TestSampleTask:
 
     def test_probability_constants_sum_to_one_delta(self, seed_gen_bot):
         """Delta mode probability constants should sum to 1.0"""
-        prob_sum = (
-            seed_gen_bot.TASK_SEED_INIT_PROB_DELTA
-            + seed_gen_bot.TASK_SEED_EXPLORE_PROB_DELTA
-        )
+        prob_sum = seed_gen_bot.TASK_SEED_INIT_PROB_DELTA + seed_gen_bot.TASK_SEED_EXPLORE_PROB_DELTA
         assert prob_sum == 1.0, f"Delta probabilities sum to {prob_sum}, expected 1.0"
 
     def test_probability_constants_sum_to_one_full(self, seed_gen_bot):
         """Full mode probability constants should sum to 1.0"""
-        prob_sum = (
-            seed_gen_bot.TASK_SEED_INIT_PROB_FULL
-            + seed_gen_bot.TASK_SEED_EXPLORE_PROB_FULL
-        )
+        prob_sum = seed_gen_bot.TASK_SEED_INIT_PROB_FULL + seed_gen_bot.TASK_SEED_EXPLORE_PROB_FULL
         assert prob_sum == 1.0, f"Full probabilities sum to {prob_sum}, expected 1.0"
 
     def test_no_min_vuln_discovery_constant(self, seed_gen_bot):
         """MIN_VULN_DISCOVERY_RUNS constant should not exist"""
-        assert not hasattr(seed_gen_bot, 'MIN_VULN_DISCOVERY_RUNS')
+        assert not hasattr(seed_gen_bot, "MIN_VULN_DISCOVERY_RUNS")
 
     def test_forced_seed_init_still_works(self, seed_gen_bot, weighted_harness):
         """Forced seed-init logic should still work"""

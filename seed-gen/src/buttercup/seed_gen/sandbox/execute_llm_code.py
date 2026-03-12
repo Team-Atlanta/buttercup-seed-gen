@@ -59,6 +59,16 @@ def wasm_run_script(root_dir: Path, script_path: Path, script_args: list[str]) -
     try:
         start(store)  # type: ignore[operator]
     except Exception as e:
+        # Log stderr content for debugging
+        if err_log.exists():
+            stderr_content = err_log.read_text()
+            if stderr_content.strip():
+                logging.error("WASM stderr:\n%s", stderr_content)
+        # Log the function file content for debugging
+        func_file = root_dir / "func.py"
+        if func_file.exists():
+            func_content = func_file.read_text()
+            logging.error("Function file content:\n%s", func_content)
         logging.exception(e)
         raise e
 

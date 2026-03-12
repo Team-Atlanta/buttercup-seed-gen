@@ -1,6 +1,5 @@
 """Shared test fixtures and utilities for seed-gen tests."""
 
-from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import MagicMock, Mock
 
@@ -329,5 +328,3 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "integration" in item.keywords:
             item.add_marker(skip_integration)
-
-

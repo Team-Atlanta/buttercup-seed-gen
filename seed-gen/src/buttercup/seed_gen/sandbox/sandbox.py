@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 def sandbox_exec_funcs(functions: str, output_dir: Path) -> None:
     """Run functions in wasm sandbox and save seeds to output_dir"""
+    logger.debug("Executing functions in sandbox:\n%s", functions)
     with tempfile.TemporaryDirectory() as workdir_str:
         workdir = Path(workdir_str)
         function_path = workdir / "func.py"
