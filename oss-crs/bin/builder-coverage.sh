@@ -158,6 +158,13 @@ def run_java_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
 def run_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
                  build_dir: Path, no_serve: bool = True) -> int:
     """Run coverage analysis on the given fuzz target."""
+    # Detect language and dispatch to appropriate handler
+    language = get_project_language(project_name)
+
+    if language in ("java", "jvm"):
+        return run_java_coverage(project_name, fuzz_target, corpus_dir, build_dir, no_serve)
+
+    # Existing C/C++ LLVM coverage logic follows
     harness_path = build_dir / fuzz_target
     if not harness_path.exists():
         print(f"Error: Harness not found at {harness_path}", file=sys.stderr)
