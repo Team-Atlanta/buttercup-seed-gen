@@ -93,21 +93,21 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CFG-01 | — | Pending |
-| CFG-02 | — | Pending |
-| COV-01 | — | Pending |
-| COV-02 | — | Pending |
-| COV-03 | — | Pending |
-| COV-04 | — | Pending |
-| INT-01 | — | Pending |
-| INT-02 | — | Pending |
-| VAL-04 | — | Pending |
-| VAL-05 | — | Pending |
+| CFG-01 | Phase 4 | Pending |
+| CFG-02 | Phase 4 | Pending |
+| COV-01 | Phase 4 | Pending |
+| COV-02 | Phase 4 | Pending |
+| COV-03 | Phase 4 | Pending |
+| COV-04 | Phase 4 | Pending |
+| INT-01 | Phase 5 | Pending |
+| INT-02 | Phase 5 | Pending |
+| VAL-04 | Phase 5 | Pending |
+| VAL-05 | Phase 5 | Pending |
 
 **v1.1 Coverage:**
 - v1.1 requirements: 10 total
-- Mapped to phases: 0
-- Unmapped: 10 (pending roadmap)
+- Mapped to phases: 10
+- Unmapped: 0
 
 ### v1.0 Traceability (Complete)
 
@@ -132,8 +132,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 **v1.0 Coverage:**
 - v1.0 requirements: 15 total
 - Mapped to phases: 15
-- Unmapped: 0 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-10*
-*Last updated: 2026-03-12 — v1.1 Java support requirements added*
+*Last updated: 2026-03-12 — v1.1 traceability updated*
