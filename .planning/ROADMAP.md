@@ -67,8 +67,8 @@ Plans:
 
 Plans:
 - [x] 03-01-PLAN.md — Verify seed-gen unit tests pass after code cleanup
-- [ ] 03-02-PLAN.md — Validate end-to-end deployment with 4 services
-- [ ] 03-03-PLAN.md — Document standalone architecture in README
+- [x] 03-02-PLAN.md — Validate end-to-end deployment with 4 services
+- [x] 03-03-PLAN.md — Document standalone architecture in README
 
 ## Progress
 
@@ -124,4 +124,4 @@ Per PROJECT.md, POV generation is **out of scope** for standalone seedgen. This 
 - libCRS watcher depends on correct CORPUS_DIR environment variable (validated in Phase 3)
 
 ---
-*Last updated: 2026-03-11*
+*Last updated: 2026-03-12*

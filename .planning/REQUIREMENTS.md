@@ -21,7 +21,7 @@ Requirements for slimmed-down oss-crs seed generator.
 - [x] **CODE-02**: Remove fuzzer case from buttercup_entrypoint script
 - [x] **CODE-03**: Remove crash queue consumer references from seedgen
 - [x] **CODE-04**: Remove POV submission path logic (no longer needed)
-- [ ] **CODE-05**: Verify libCRS seed submission continues working (already implemented)
+- [x] **CODE-05**: Verify libCRS seed submission continues working (already implemented)
 
 ### Cleanup
 
@@ -30,9 +30,9 @@ Requirements for slimmed-down oss-crs seed generator.
 
 ### Validation
 
-- [ ] **VAL-01**: Services deploy successfully with slimmed configuration
-- [ ] **VAL-02**: Seedgen generates and submits seeds via libCRS
-- [ ] **VAL-03**: Coverage-bot runs without fuzzer-bot dependency
+- [x] **VAL-01**: Services deploy successfully with slimmed configuration
+- [x] **VAL-02**: Seedgen generates and submits seeds via libCRS
+- [x] **VAL-03**: Coverage-bot runs without fuzzer-bot dependency
 
 ## v2 Requirements
 
@@ -68,12 +68,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CODE-02 | Phase 1 | Complete |
 | CODE-03 | Phase 2 | Complete |
 | CODE-04 | Phase 2 | Complete |
-| CODE-05 | Phase 3 | Pending |
+| CODE-05 | Phase 3 | Complete |
 | CLN-01 | Phase 1 | Complete |
 | CLN-02 | Phase 2 | Complete |
-| VAL-01 | Phase 3 | Pending |
-| VAL-02 | Phase 3 | Pending |
-| VAL-03 | Phase 3 | Pending |
+| VAL-01 | Phase 3 | Complete |
+| VAL-02 | Phase 3 | Complete |
+| VAL-03 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 15 total
@@ -82,4 +82,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-10*
-*Last updated: 2026-03-10 with phase mappings*
+*Last updated: 2026-03-12 — all validation requirements complete*
