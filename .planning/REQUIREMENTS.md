@@ -9,7 +9,7 @@ Requirements for Java/Jazzer support with JaCoCo coverage integration.
 
 ### Configuration
 
-- [ ] **CFG-01**: crs.yaml declares `java` and `jvm` in `supported_target.language`
+- [x] **CFG-01**: crs.yaml declares `java` and `jvm` in `supported_target.language`
 - [ ] **CFG-02**: helper.py detects language from project.yaml
 
 ### Coverage Infrastructure
@@ -17,7 +17,7 @@ Requirements for Java/Jazzer support with JaCoCo coverage integration.
 - [ ] **COV-01**: JaCoCo agent runs Jazzer target with `--additional_jvm_args=-javaagent:/opt/jacoco-agent.jar=...`
 - [ ] **COV-02**: JaCoCo CLI generates XML report from .exec file via `java -jar /opt/jacoco-cli.jar report`
 - [ ] **COV-03**: XML report placed at `<build_dir>/dumps/<harness>.xml` (CoverageRunner.run_java() expected path)
-- [ ] **COV-04**: JaCoCo JARs (`jacoco-agent.jar`, `jacoco-cli.jar`) available in coverage builder image
+- [x] **COV-04**: JaCoCo JARs (`jacoco-agent.jar`, `jacoco-cli.jar`) available in coverage builder image
 
 ### Integration
 
@@ -93,12 +93,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CFG-01 | Phase 4 | Pending |
+| CFG-01 | Phase 4 | Complete |
 | CFG-02 | Phase 4 | Pending |
 | COV-01 | Phase 4 | Pending |
 | COV-02 | Phase 4 | Pending |
 | COV-03 | Phase 4 | Pending |
-| COV-04 | Phase 4 | Pending |
+| COV-04 | Phase 4 | Complete |
 | INT-01 | Phase 5 | Pending |
 | INT-02 | Phase 5 | Pending |
 | VAL-04 | Phase 5 | Pending |

@@ -1,22 +1,22 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.1
-milestone_name: java-support
-current_phase: 4
-status: ready_to_plan
-last_updated: "2026-03-12T00:00:00.000Z"
+milestone_name: Java Support
+current_phase: Phase 4 - Java Coverage Infrastructure
+status: planning
+last_updated: "2026-03-12T20:52:15.152Z"
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 8
+  completed_plans: 7
 ---
 
 # Project State: Buttercup Seed-Gen Standalone
 
 **Last Updated:** 2026-03-12
 **Current Phase:** Phase 4 - Java Coverage Infrastructure
-**Status:** Ready to plan
+**Status:** In progress (Plan 1 of 2 complete)
 
 ## Project Reference
 
@@ -29,10 +29,10 @@ progress:
 ## Current Position
 
 **Phase**: 4 of 5 (Java Coverage Infrastructure)
-**Plan**: 0 of ? (not yet planned)
-**Status**: Ready to plan
+**Plan**: 1 of 2 complete
+**Status**: In progress
 
-**Progress**: `[======....] 60% (3/5 phases complete)`
+**Progress**: `[█████████░] 88% (7/8 plans complete)`
 
 ## Performance Metrics
 
@@ -44,12 +44,20 @@ progress:
 
 **v1.1 Current**:
 - Phases planned: 2 (Phase 4, Phase 5)
+- Plans completed: 1 (04-01)
+- Tasks completed: 2
 - Requirements defined: 10
 - Requirements mapped: 10/10 (100%)
 
 ## Accumulated Context
 
 ### Recent Decisions
+
+**2026-03-12**: Completed 04-01 (Java Language Configuration)
+- Added java and jvm to crs.yaml supported_target.language
+- Installed JaCoCo 0.8.11 JARs in coverage builder image at /opt/
+- Use JaCoCo 0.8.11 for Java coverage instrumentation
+- Install JaCoCo JARs to /opt/ directory for system-wide availability
 
 **2026-03-12**: v1.1 Roadmap created with 2 phases
 - Phase 4: Java Coverage Infrastructure (6 requirements: CFG-01, CFG-02, COV-01, COV-02, COV-03, COV-04)
@@ -70,13 +78,13 @@ progress:
 
 ### Active TODOs
 
-**Phase 04 - Java Coverage Infrastructure**: Not started
-- [ ] Add java/jvm to crs.yaml supported_target.language (CFG-01)
+**Phase 04 - Java Coverage Infrastructure**: 1 of 2 plans complete
+- [x] Add java/jvm to crs.yaml supported_target.language (CFG-01) — 04-01
+- [x] JaCoCo JARs in Docker image (COV-04) — 04-01
 - [ ] Add language detection to helper.py (CFG-02)
 - [ ] JaCoCo agent runs Jazzer with additional_jvm_args (COV-01)
 - [ ] JaCoCo CLI generates XML from .exec (COV-02)
 - [ ] XML placed at expected path (COV-03)
-- [ ] JaCoCo JARs in Docker image (COV-04)
 
 **Phase 05 - Integration & Validation**: Blocked on Phase 4
 - [ ] helper.py dispatches Java vs C coverage (INT-01)
