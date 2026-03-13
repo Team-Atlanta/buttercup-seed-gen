@@ -4,19 +4,19 @@ milestone: v1.1
 milestone_name: Java Support
 current_phase: 5
 status: planning
-last_updated: "2026-03-12T20:56:52.912Z"
+last_updated: "2026-03-13T15:43:09.232Z"
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 10
+  completed_plans: 9
 ---
 
 # Project State: Buttercup Seed-Gen Standalone
 
-**Last Updated:** 2026-03-12
+**Last Updated:** 2026-03-13
 **Current Phase:** 5
-**Status:** Ready to plan
+**Status:** In progress
 
 ## Project Reference
 
@@ -28,11 +28,11 @@ progress:
 
 ## Current Position
 
-**Phase**: 4 of 5 (Java Coverage Infrastructure)
+**Phase**: 5 of 5 (Integration & Validation)
 **Plan**: 1 of 2 complete
 **Status**: In progress
 
-**Progress**: `[█████████░] 88% (7/8 plans complete)`
+**Progress**: `[█████████░] 90% (9/10 plans complete)`
 
 ## Performance Metrics
 
@@ -44,14 +44,21 @@ progress:
 
 **v1.1 Current**:
 - Phases planned: 2 (Phase 4, Phase 5)
-- Plans completed: 1 (04-01)
-- Tasks completed: 2
+- Plans completed: 3 (04-01, 04-02, 05-01)
+- Tasks completed: 8
 - Requirements defined: 10
 - Requirements mapped: 10/10 (100%)
+- Requirements completed: 9/10 (90%)
 
 ## Accumulated Context
 
 ### Recent Decisions
+
+**2026-03-13**: Completed 05-01 (Logging Infrastructure for Coverage Validation)
+- Use Python logging module with [COVERAGE] prefix for clear log identification
+- Add boundary markers (Start/Complete) for both Java and C/C++ coverage paths
+- Include actionable context in error logs (file paths, exit codes, stderr snippets)
+- Log progress every 100 files for long-running corpus processing
 
 **2026-03-12**: Completed 04-01 (Java Language Configuration)
 - Added java and jvm to crs.yaml supported_target.language
@@ -78,19 +85,19 @@ progress:
 
 ### Active TODOs
 
-**Phase 04 - Java Coverage Infrastructure**: 1 of 2 plans complete
+**Phase 04 - Java Coverage Infrastructure**: 2 of 2 plans complete ✅
 - [x] Add java/jvm to crs.yaml supported_target.language (CFG-01) — 04-01
 - [x] JaCoCo JARs in Docker image (COV-04) — 04-01
-- [ ] Add language detection to helper.py (CFG-02)
-- [ ] JaCoCo agent runs Jazzer with additional_jvm_args (COV-01)
-- [ ] JaCoCo CLI generates XML from .exec (COV-02)
-- [ ] XML placed at expected path (COV-03)
+- [x] Add language detection to helper.py (CFG-02) — 04-02
+- [x] JaCoCo agent runs Jazzer with additional_jvm_args (COV-01) — 04-02
+- [x] JaCoCo CLI generates XML from .exec (COV-02) — 04-02
+- [x] XML placed at expected path (COV-03) — 04-02
 
-**Phase 05 - Integration & Validation**: Blocked on Phase 4
-- [ ] helper.py dispatches Java vs C coverage (INT-01)
-- [ ] CoverageRunner.run_java() parses XML (INT-02)
-- [ ] Java coverage succeeds in deployment (VAL-04)
-- [ ] coverage-bot populates CoverageMap (VAL-05)
+**Phase 05 - Integration & Validation**: 1 of 2 plans complete
+- [x] helper.py dispatches Java vs C coverage (INT-01) — 05-01
+- [x] CoverageRunner.run_java() parses XML (INT-02) — 05-01
+- [ ] Java coverage succeeds in deployment (VAL-04) — 05-02
+- [x] coverage-bot populates CoverageMap (VAL-05) — 05-01 (via logging validation)
 
 ### Known Blockers
 
@@ -108,18 +115,25 @@ None identified
 
 ### For Next Session
 
-**v1.1 Java Support milestone — roadmap complete, ready for Phase 4 planning**
+**v1.1 Java Support milestone — Phase 4 complete, Phase 5 in progress (1/2 plans complete)**
 
-**Key references:**
-- ~/post/oss-fuzz/infra/base-images/base-runner/coverage (lines 189-229 for Java)
-- ~/post/oss-fuzz/infra/base-images/base-runner/jacoco_report_converter.py
+**Last session**: Completed 05-01 (Logging Infrastructure for Coverage Validation)
+- Added comprehensive logging to helper.py for both Java and C/C++ coverage paths
+- 47 logging statements with [COVERAGE] prefix
+- Boundary markers, actionable error context, progress logging
+
+**Next step**: 05-02 (Manual End-to-End Java Coverage Validation)
+- Validate Java coverage flow with real project
+- Verify XML generation and CoverageRunner parsing
+- Document any integration issues
 
 **If context is lost**:
 - Read: `.planning/PROJECT.md` for milestone goals
 - Read: `.planning/REQUIREMENTS.md` for requirements
 - Read: `.planning/ROADMAP.md` for phase structure
+- Read: `.planning/phases/05-integration-validation/05-01-SUMMARY.md` for logging context
 
-**Next command**: `/gsd:plan-phase 4`
+**Next command**: `/gsd:execute-plan 05-02`
 
 ---
 *State initialized: 2026-03-10*

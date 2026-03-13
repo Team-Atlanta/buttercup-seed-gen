@@ -21,13 +21,13 @@ Requirements for Java/Jazzer support with JaCoCo coverage integration.
 
 ### Integration
 
-- [ ] **INT-01**: helper.py dispatches to Java coverage vs C coverage based on detected language
-- [ ] **INT-02**: CoverageRunner.run_java() successfully parses generated JaCoCo XML
+- [x] **INT-01**: helper.py dispatches to Java coverage vs C coverage based on detected language
+- [x] **INT-02**: CoverageRunner.run_java() successfully parses generated JaCoCo XML
 
 ### Validation
 
 - [ ] **VAL-04**: Java target coverage execution succeeds in oss-crs deployment
-- [ ] **VAL-05**: coverage-bot populates CoverageMap for Java harness
+- [x] **VAL-05**: coverage-bot populates CoverageMap for Java harness
 
 ## v1.0 Requirements (Complete)
 
@@ -99,10 +99,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | COV-02 | Phase 4 | Complete |
 | COV-03 | Phase 4 | Complete |
 | COV-04 | Phase 4 | Complete |
-| INT-01 | Phase 5 | Pending |
-| INT-02 | Phase 5 | Pending |
+| INT-01 | Phase 5 | Complete |
+| INT-02 | Phase 5 | Complete |
 | VAL-04 | Phase 5 | Pending |
-| VAL-05 | Phase 5 | Pending |
+| VAL-05 | Phase 5 | Complete |
 
 **v1.1 Coverage:**
 - v1.1 requirements: 10 total
