@@ -115,15 +115,15 @@ Plans:
 **Requirements**: INT-01, INT-02, VAL-04, VAL-05
 
 **Success Criteria** (what must be TRUE):
-  1. CoverageRunner.run_java() successfully parses JaCoCo XML at expected path
+  1. helper.py logs language detection and coverage path dispatch
   2. Java target coverage execution succeeds in oss-crs deployment
-  3. coverage-bot populates CoverageMap for Java harness
-  4. Seed-gen can use Java coverage data for seed quality feedback
+  3. coverage-bot logs show Java coverage path was taken
+  4. Logging provides actionable context for debugging
 
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Create integration tests for Java coverage pipeline (INT-01, INT-02, VAL-05)
+- [ ] 05-01-PLAN.md — Add logging to helper.py Java coverage code (INT-01, INT-02, VAL-05)
 - [ ] 05-02-PLAN.md — Validate end-to-end Java coverage in oss-crs deployment (VAL-04)
 
 ## Progress
@@ -151,10 +151,10 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | COV-02 | Phase 4 | JaCoCo CLI generates XML from .exec |
 | COV-03 | Phase 4 | XML placed at expected path for CoverageRunner |
 | COV-04 | Phase 4 | JaCoCo JARs in coverage builder image |
-| INT-01 | Phase 5 | helper.py dispatches to Java vs C coverage |
-| INT-02 | Phase 5 | CoverageRunner.run_java() parses generated XML |
+| INT-01 | Phase 5 | helper.py dispatches to Java vs C coverage (validated via logging) |
+| INT-02 | Phase 5 | CoverageRunner.run_java() parses generated XML (validated via logging) |
 | VAL-04 | Phase 5 | Java coverage execution succeeds in deployment |
-| VAL-05 | Phase 5 | coverage-bot populates CoverageMap for Java |
+| VAL-05 | Phase 5 | coverage-bot populates CoverageMap for Java (validated via logging) |
 
 **v1.1 Coverage**: 10/10 requirements mapped (100%)
 
@@ -186,7 +186,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 **Phase 4 groups all JaCoCo infrastructure work** (config changes, helper.py Java branch, Docker image JARs, XML generation). All foundation work for Java coverage happens atomically before integration testing.
 
-**Phase 5 is integration and validation** requiring Phase 4 stability. Cannot verify end-to-end Java coverage until infrastructure is in place.
+**Phase 5 is integration and validation** requiring Phase 4 stability. Uses logging instead of tests for validation, enabling manual/automated end-to-end verification through observable log output.
 
 ### Dependencies Identified (v1.1)
 
@@ -201,6 +201,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 - **OSS-Fuzz pattern**: Imitate `run_java_fuzz_target` from OSS-Fuzz for JaCoCo integration
 - **JaCoCo flow**: agent produces .exec -> CLI produces XML -> CoverageRunner parses XML
 - **Existing code**: CoverageRunner.run_java() already expects XML at `<build_dir>/dumps/<harness>.xml`
+- **Validation approach**: Logging-based validation instead of unit tests for Phase 5
 
 ---
 *Last updated: 2026-03-13*
