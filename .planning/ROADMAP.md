@@ -82,7 +82,7 @@ Plans:
 
 **Milestone Goal:** Add full Java/Jazzer support to seed-gen standalone with JaCoCo coverage integration.
 
-- [ ] **Phase 4: Java Coverage Infrastructure** - JaCoCo execution in helper.py and Docker image setup
+- [x] **Phase 4: Java Coverage Infrastructure** - JaCoCo execution in helper.py and Docker image setup (completed 2026-03-12)
 - [ ] **Phase 5: Integration & Validation** - End-to-end Java coverage verification
 
 ## Phase Details
@@ -104,8 +104,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Add java/jvm to crs.yaml and install JaCoCo JARs in Docker image
-- [ ] 04-02-PLAN.md — Add Java coverage support to helper.py with JaCoCo integration
+- [x] 04-01-PLAN.md — Add java/jvm to crs.yaml and install JaCoCo JARs in Docker image
+- [x] 04-02-PLAN.md — Add Java coverage support to helper.py with JaCoCo integration
 
 ### Phase 5: Integration & Validation
 **Goal**: Java coverage flows end-to-end from execution to CoverageMap
@@ -120,10 +120,11 @@ Plans:
   3. coverage-bot populates CoverageMap for Java harness
   4. Seed-gen can use Java coverage data for seed quality feedback
 
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: TBD
+- [ ] 05-01-PLAN.md — Create integration tests for Java coverage pipeline (INT-01, INT-02, VAL-05)
+- [ ] 05-02-PLAN.md — Validate end-to-end Java coverage in oss-crs deployment (VAL-04)
 
 ## Progress
 
@@ -135,8 +136,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Service & Configuration Removal | v1.0 | 1/1 | Complete | 2026-03-10 |
 | 2. Code Cleanup | v1.0 | 2/2 | Complete | 2026-03-10 |
 | 3. Validation & Documentation | v1.0 | 3/3 | Complete | 2026-03-11 |
-| 4. Java Coverage Infrastructure | v1.1 | 0/2 | Planned | - |
-| 5. Integration & Validation | v1.1 | 0/? | Not started | - |
+| 4. Java Coverage Infrastructure | v1.1 | 2/2 | Complete | 2026-03-12 |
+| 5. Integration & Validation | v1.1 | 0/2 | Planned | - |
 
 ## Coverage Map
 
@@ -202,4 +203,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 - **Existing code**: CoverageRunner.run_java() already expects XML at `<build_dir>/dumps/<harness>.xml`
 
 ---
-*Last updated: 2026-03-12*
+*Last updated: 2026-03-13*
