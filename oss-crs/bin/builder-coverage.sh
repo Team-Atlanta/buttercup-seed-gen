@@ -112,12 +112,24 @@ def get_project_language(project_name: str) -> str:
 def run_java_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
                       build_dir: Path, no_serve: bool = True) -> int:
     """Run Java coverage using JaCoCo agent and CLI."""
+    logger.info(f"=== Java Coverage Start ===")
+    logger.info(f"  Project: {project_name}")
+    logger.info(f"  Target:  {fuzz_target}")
+    logger.info(f"  Corpus:  {corpus_dir}")
+    logger.info(f"  Build:   {build_dir}")
+
     harness_path = build_dir / fuzz_target
     corpus_path = Path(corpus_dir)
 
-    if not corpus_path.exists() or not list(corpus_path.iterdir()):
-        print(f"Warning: No corpus files in {corpus_dir}", file=sys.stderr)
+    if not corpus_path.exists():
+        logger.error(f"Corpus directory does not exist: {corpus_dir}")
+        return 1
+
+    corpus_files = list(corpus_path.iterdir())
+    if not corpus_files:
+        logger.warning(f"No corpus files in {corpus_dir}, skipping coverage")
         return 0
+    logger.info(f"Found {len(corpus_files)} corpus files")
 
     dumps_dir = build_dir / "dumps"
     dumps_dir.mkdir(parents=True, exist_ok=True)
@@ -131,6 +143,11 @@ def run_java_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
     # JaCoCo agent arguments (imitate OSS-Fuzz pattern)
     jacoco_args = f"destfile={exec_file},classdumpdir={class_dump_dir},excludes=com.code_intelligence.jazzer.*"
 
+    logger.info(f"JaCoCo agent config:")
+    logger.info(f"  Exec file:    {exec_file}")
+    logger.info(f"  Class dump:   {class_dump_dir}")
+    logger.info(f"  Excludes:     com.code_intelligence.jazzer.*")
+
     # Run Jazzer with JaCoCo agent against corpus
     # Use -merge=1 to process all corpus files in one run
     jazzer_cmd = [
@@ -142,12 +159,18 @@ def run_java_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
         str(corpus_path),
     ]
 
-    print(f"Running Jazzer with JaCoCo: {' '.join(jazzer_cmd)}", file=sys.stderr)
+    logger.info(f"Executing Jazzer: {' '.join(jazzer_cmd)}")
     result = subprocess.run(jazzer_cmd, capture_output=True, text=True)
+    logger.info(f"Jazzer exit code: {result.returncode}")
+    if result.stderr:
+        logger.debug(f"Jazzer stderr (truncated): {result.stderr[:500]}")
 
     if not exec_file.exists():
-        print(f"Error: JaCoCo exec file not created at {exec_file}", file=sys.stderr)
+        logger.error(f"JaCoCo exec file NOT created at {exec_file}")
+        logger.error(f"Jazzer stdout: {result.stdout[:500] if result.stdout else 'empty'}")
+        logger.error(f"Jazzer stderr: {result.stderr[:500] if result.stderr else 'empty'}")
         return 1
+    logger.info(f"JaCoCo exec file created: {exec_file} ({exec_file.stat().st_size} bytes)")
 
     # Generate XML report using JaCoCo CLI
     cli_cmd = [
@@ -157,14 +180,20 @@ def run_java_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
         "--classfiles", str(class_dump_dir),
     ]
 
-    print(f"Generating XML report: {' '.join(cli_cmd)}", file=sys.stderr)
+    logger.info(f"Generating XML report: {' '.join(cli_cmd)}")
     result = subprocess.run(cli_cmd, capture_output=True, text=True)
-
     if result.returncode != 0:
-        print(f"Error generating XML report: {result.stderr}", file=sys.stderr)
+        logger.error(f"XML generation failed (exit {result.returncode})")
+        logger.error(f"CLI stderr: {result.stderr}")
         return 1
 
-    print(f"Coverage XML written to {xml_report}", file=sys.stderr)
+    if xml_report.exists():
+        logger.info(f"XML report created: {xml_report} ({xml_report.stat().st_size} bytes)")
+    else:
+        logger.error(f"XML report NOT created at {xml_report}")
+        return 1
+
+    logger.info(f"=== Java Coverage Complete ===")
     return 0
 
 
