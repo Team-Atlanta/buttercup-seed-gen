@@ -77,6 +77,7 @@ cat > "$OSS_FUZZ_SUBDIR/infra/helper.py" << 'HELPER_EOF'
 #!/usr/bin/env python3
 """OSS-CRS coverage helper - runs coverage analysis on pre-built fuzzers."""
 import argparse
+import logging
 import os
 import subprocess
 import sys
@@ -84,15 +85,27 @@ import tempfile
 import yaml
 from pathlib import Path
 
+# Configure logging for coverage helper
+logging.basicConfig(
+    level=logging.INFO,
+    format='[COVERAGE] %(levelname)s: %(message)s',
+    stream=sys.stderr
+)
+logger = logging.getLogger('coverage_helper')
+
 
 def get_project_language(project_name: str) -> str:
     """Detect language from project.yaml, default to 'c'."""
     helper_dir = Path(__file__).parent.parent  # oss-fuzz/
     project_yaml = helper_dir / "projects" / project_name / "project.yaml"
+    logger.info(f"Language detection: checking {project_yaml}")
     if project_yaml.exists():
         with open(project_yaml) as f:
             config = yaml.safe_load(f)
-            return config.get("language", "c").lower()
+            language = config.get("language", "c").lower()
+            logger.info(f"Detected language '{language}' for project '{project_name}'")
+            return language
+    logger.warning(f"No project.yaml found at {project_yaml}, defaulting to 'c'")
     return "c"
 
 
@@ -162,22 +175,31 @@ def run_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
     language = get_project_language(project_name)
 
     if language in ("java", "jvm"):
+        logger.info(f"Dispatching to JAVA coverage path for '{fuzz_target}'")
         return run_java_coverage(project_name, fuzz_target, corpus_dir, build_dir, no_serve)
 
+    logger.info(f"Dispatching to C/C++ LLVM coverage path for '{fuzz_target}'")
     # Existing C/C++ LLVM coverage logic follows
+    logger.info(f"=== C/C++ Coverage Start ===")
+    logger.info(f"  Project: {project_name}")
+    logger.info(f"  Target:  {fuzz_target}")
+    logger.info(f"  Corpus:  {corpus_dir}")
+    logger.info(f"  Build:   {build_dir}")
+
     harness_path = build_dir / fuzz_target
     if not harness_path.exists():
-        print(f"Error: Harness not found at {harness_path}", file=sys.stderr)
+        logger.error(f"Harness not found at {harness_path}")
         return 1
+    logger.info(f"Harness found: {harness_path}")
 
     corpus_path = Path(corpus_dir)
     if not corpus_path.exists():
-        print(f"Error: Corpus directory not found: {corpus_dir}", file=sys.stderr)
+        logger.error(f"Corpus directory not found: {corpus_dir}")
         return 1
 
     corpus_files = list(corpus_path.iterdir())
     if not corpus_files:
-        print(f"Warning: No corpus files in {corpus_dir}", file=sys.stderr)
+        logger.warning(f"No corpus files in {corpus_dir}, creating empty profdata")
         # Still create empty profdata for consistency
         dumps_dir = build_dir / "dumps"
         dumps_dir.mkdir(parents=True, exist_ok=True)
@@ -189,6 +211,8 @@ def run_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
                        check=False, capture_output=True)
         return 0
 
+    logger.info(f"Processing {len(corpus_files)} corpus files")
+
     # Create dumps directory for profraw files
     dumps_dir = build_dir / "dumps"
     dumps_dir.mkdir(parents=True, exist_ok=True)
@@ -196,8 +220,6 @@ def run_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
     # Run harness against each corpus file with coverage instrumentation
     profraw_dir = dumps_dir / "profraw"
     profraw_dir.mkdir(parents=True, exist_ok=True)
-
-    print(f"Running coverage on {len(corpus_files)} corpus files...", file=sys.stderr)
 
     for i, corpus_file in enumerate(corpus_files):
         if not corpus_file.is_file():
@@ -217,18 +239,24 @@ def run_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
                 capture_output=True,
             )
         except subprocess.TimeoutExpired:
-            print(f"  Timeout on {corpus_file.name}", file=sys.stderr)
+            logger.debug(f"  Timeout on {corpus_file.name}")
         except Exception as e:
-            print(f"  Error on {corpus_file.name}: {e}", file=sys.stderr)
+            logger.debug(f"  Error on {corpus_file.name}: {e}")
+
+        # Log progress every 100 files
+        if (i + 1) % 100 == 0:
+            logger.info(f"  Processed {i + 1}/{len(corpus_files)} corpus files")
+
+    logger.info(f"Processed all {len(corpus_files)} corpus files")
 
     # Merge all profraw files into profdata
     profraw_files = list(profraw_dir.glob("*.profraw"))
     if not profraw_files:
-        print("Warning: No profraw files generated", file=sys.stderr)
+        logger.error("No profraw files generated")
         return 1
 
     profdata_path = dumps_dir / "merged.profdata"
-    print(f"Merging {len(profraw_files)} profraw files...", file=sys.stderr)
+    logger.info(f"Merging {len(profraw_files)} profraw files to {profdata_path}")
 
     # Use local llvm-profdata from build dir if available (matches build LLVM version)
     local_profdata = build_dir / "llvm-profdata"
@@ -239,10 +267,11 @@ def run_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
 
     result = subprocess.run(merge_cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        print(f"Error merging profraw files: {result.stderr}", file=sys.stderr)
+        logger.error(f"llvm-profdata merge failed: {result.stderr}")
         return 1
 
-    print(f"Coverage profdata written to {profdata_path}", file=sys.stderr)
+    logger.info(f"Profdata created: {profdata_path} ({profdata_path.stat().st_size} bytes)")
+    logger.info(f"=== C/C++ Coverage Complete ===")
     return 0
 
 
