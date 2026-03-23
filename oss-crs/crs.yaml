@@ -46,7 +46,6 @@ supported_target:
   language:
     - c
     - c++
-    - java
     - jvm
   sanitizer:
     - address
