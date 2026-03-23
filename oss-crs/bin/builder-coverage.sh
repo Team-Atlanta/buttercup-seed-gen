@@ -358,7 +358,7 @@ done
 if [ ! -f "$PROJ_DEST/project.yaml" ]; then
     cat > "$PROJ_DEST/project.yaml" << PROJYAML
 homepage: "https://github.com/example"
-language: c
+language: ${FUZZING_LANGUAGE:-c}
 primary_contact: "oss-crs@example.com"
 PROJYAML
 fi

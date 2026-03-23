@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -32,7 +33,10 @@ class ProjectYaml:
 
         with open(project_yaml_path) as f:
             yaml_content = yaml.safe_load(f)
-        self._language = yaml_content.get("language")
+
+        # Prefer FUZZING_LANGUAGE env var over project.yaml (more reliable in oss-crs)
+        env_language = os.environ.get("FUZZING_LANGUAGE")
+        self._language = env_language if env_language else yaml_content.get("language")
         self._sanitizers = yaml_content.get("sanitizers", ["address"])
         self._fuzzing_engines = yaml_content.get("fuzzing_engines", ["libfuzzer"])
 
