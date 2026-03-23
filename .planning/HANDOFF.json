@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-03-23T16:10:11.491Z",
+  "phase": "05",
+  "phase_name": "integration-validation",
+  "phase_dir": ".planning/phases/05-integration-validation",
+  "plan": 2,
+  "task": 1,
+  "total_tasks": 1,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": "05-01", "name": "Add logging to helper.py Java coverage code", "status": "done", "commit": "64a1fee"}
+  ],
+  "remaining_tasks": [
+    {"id": "05-02", "name": "Validate end-to-end Java coverage in deployment", "status": "blocked", "progress": "Human checkpoint - blocked on harness discovery bug"}
+  ],
+  "blockers": [
+    {
+      "description": "find_harness.py cannot find Java harnesses because builder-codequery.sh only copies target source (/src) to container_src_dir/, not the fuzz-proj where harness files (OssFuzz1.java) live",
+      "type": "technical",
+      "workaround": "Update builder-codequery.sh to also copy /OSS_CRS_FUZZ_PROJ to container_src_dir/"
+    }
+  ],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "Phase 5 replanned to add logging instead of integration tests", "rationale": "User requested logging for observability over test infrastructure overhead", "phase": "05"},
+    {"decision": "Keep current find_harness implementation", "rationale": "Confirmed original buttercup uses /src which contains both target and fuzz-proj; oss-crs-6 splits these", "phase": "05"}
+  ],
+  "uncommitted_files": [".planning/config.json", ".serena/project.yml", "java-support.md"],
+  "next_action": "Fix builder-codequery.sh to copy fuzz-proj to container_src_dir/ so find_jazzer_harnesses() can discover Java harnesses",
+  "context_notes": "Phase 4 (JaCoCo infrastructure) completed successfully. Phase 5 plan 01 (logging) completed. Plan 02 (deployment validation) blocked because seed-init fails with 'No harness found' - root cause traced to builder-codequery.sh not copying fuzz-proj. The harness source OssFuzz1.java is in /OSS_CRS_FUZZ_PROJ but find_harness.py searches container_src_dir/ which only has target source."
+}
