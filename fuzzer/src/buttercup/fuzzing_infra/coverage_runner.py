@@ -373,6 +373,11 @@ class CoverageRunner:
         ret = self.tool.run_coverage(harness_name, corpus_dir)
         if not ret.success:
             logger.error(f"Failed to run coverage for {harness_name} | {corpus_dir} | {self.tool.project_name}")
+            if ret.output:
+                logger.error(f"Coverage stdout: {ret.output.decode('utf-8', errors='ignore')[:2000]}")
+            if ret.error:
+                logger.error(f"Coverage stderr: {ret.error.decode('utf-8', errors='ignore')[:2000]}")
+            logger.error(f"Coverage returncode: {ret.returncode}")
             return None
 
         build_dir = self.tool.get_build_dir()
@@ -426,6 +431,11 @@ class CoverageRunner:
         ret = self.tool.run_coverage(harness_name, corpus_dir)
         if not ret.success:
             logger.error(f"Failed to run coverage for {harness_name} | {corpus_dir} | {self.tool.project_name}")
+            if ret.output:
+                logger.error(f"Coverage stdout: {ret.output.decode('utf-8', errors='ignore')[:2000]}")
+            if ret.error:
+                logger.error(f"Coverage stderr: {ret.error.decode('utf-8', errors='ignore')[:2000]}")
+            logger.error(f"Coverage returncode: {ret.returncode}")
             return None
 
         # after we run coverage we need to find the profdata report then convert it to json, and load it

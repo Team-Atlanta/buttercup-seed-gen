@@ -95,7 +95,13 @@ logger = logging.getLogger('coverage_helper')
 
 
 def get_project_language(project_name: str) -> str:
-    """Detect language from project.yaml, default to 'c'."""
+    """Detect language from FUZZING_LANGUAGE env var or project.yaml, default to 'c'."""
+    # Prefer FUZZING_LANGUAGE env var (set by oss-crs-6) over project.yaml
+    env_language = os.environ.get("FUZZING_LANGUAGE")
+    if env_language:
+        logger.info(f"Using FUZZING_LANGUAGE env var: '{env_language}'")
+        return env_language.lower()
+
     helper_dir = Path(__file__).parent.parent  # oss-fuzz/
     project_yaml = helper_dir / "projects" / project_name / "project.yaml"
     logger.info(f"Language detection: checking {project_yaml}")
@@ -143,24 +149,44 @@ def run_java_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
     # JaCoCo agent arguments (imitate OSS-Fuzz pattern)
     jacoco_args = f"destfile={exec_file},classdumpdir={class_dump_dir},excludes=com.code_intelligence.jazzer.*"
 
+    # JaCoCo jar paths - prefer build_dir (copied from builder), fallback to /opt
+    jacoco_agent = build_dir / "jacoco-agent.jar"
+    jacoco_cli = build_dir / "jacoco-cli.jar"
+    if not jacoco_agent.exists():
+        jacoco_agent = Path("/opt/jacoco-agent.jar")
+    if not jacoco_cli.exists():
+        jacoco_cli = Path("/opt/jacoco-cli.jar")
+
     logger.info(f"JaCoCo agent config:")
+    logger.info(f"  Agent jar:    {jacoco_agent}")
+    logger.info(f"  CLI jar:      {jacoco_cli}")
     logger.info(f"  Exec file:    {exec_file}")
     logger.info(f"  Class dump:   {class_dump_dir}")
     logger.info(f"  Excludes:     com.code_intelligence.jazzer.*")
 
+    if not jacoco_agent.exists():
+        logger.error(f"JaCoCo agent not found at {jacoco_agent}")
+        return 1
+
     # Run Jazzer with JaCoCo agent against corpus
-    # Use -merge=1 to process all corpus files in one run
+    # Use JAVA_TOOL_OPTIONS env var to inject JaCoCo agent (JVM respects this automatically)
+    # The --additional_jvm_args flag is an OSS-Fuzz convention not understood by jazzer_driver
     jazzer_cmd = [
         str(harness_path),
         "-merge=1",
         "-timeout=100",
         "--nohooks",
-        f"--additional_jvm_args=-javaagent:/opt/jacoco-agent.jar={jacoco_args}",
         str(corpus_path),
     ]
 
+    # Set JAVA_TOOL_OPTIONS to inject JaCoCo agent into the JVM
+    env = os.environ.copy()
+    jacoco_jvm_arg = f"-javaagent:{jacoco_agent}={jacoco_args}"
+    env["JAVA_TOOL_OPTIONS"] = jacoco_jvm_arg
+    logger.info(f"JAVA_TOOL_OPTIONS={jacoco_jvm_arg}")
+
     logger.info(f"Executing Jazzer: {' '.join(jazzer_cmd)}")
-    result = subprocess.run(jazzer_cmd, capture_output=True, text=True)
+    result = subprocess.run(jazzer_cmd, capture_output=True, text=True, env=env)
     logger.info(f"Jazzer exit code: {result.returncode}")
     if result.stderr:
         logger.debug(f"Jazzer stderr (truncated): {result.stderr[:500]}")
@@ -173,8 +199,12 @@ def run_java_coverage(project_name: str, fuzz_target: str, corpus_dir: str,
     logger.info(f"JaCoCo exec file created: {exec_file} ({exec_file.stat().st_size} bytes)")
 
     # Generate XML report using JaCoCo CLI
+    if not jacoco_cli.exists():
+        logger.error(f"JaCoCo CLI not found at {jacoco_cli}")
+        return 1
+
     cli_cmd = [
-        "java", "-jar", "/opt/jacoco-cli.jar",
+        "java", "-jar", str(jacoco_cli),
         "report", str(exec_file),
         "--xml", str(xml_report),
         "--classfiles", str(class_dump_dir),
@@ -391,6 +421,17 @@ for llvm_tool in llvm-profdata llvm-cov; do
         echo "[builder-coverage] Copied $llvm_tool from PATH"
     else
         echo "[builder-coverage] WARNING: $llvm_tool not found"
+    fi
+done
+
+# Copy JaCoCo tools for Java coverage analysis
+# These were installed in the builder-coverage Dockerfile to /opt
+for jacoco_tool in jacoco-agent.jar jacoco-cli.jar; do
+    if [ -f "/opt/$jacoco_tool" ]; then
+        cp "/opt/$jacoco_tool" "$BUILD_OUT/"
+        echo "[builder-coverage] Copied $jacoco_tool from /opt"
+    else
+        echo "[builder-coverage] WARNING: $jacoco_tool not found in /opt"
     fi
 done
 
