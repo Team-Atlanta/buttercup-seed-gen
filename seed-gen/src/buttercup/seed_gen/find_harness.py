@@ -112,6 +112,28 @@ def _find_source_files(
     return _exclude_common_harnesses(harness_files, container_src_dir)
 
 
+def _find_harness_by_name(codequery: CodeQuery, harness_name: str, extensions: list[str]) -> Path | None:
+    """Find a harness source file by exact name match.
+
+    Searches container_src_dir for {harness_name}.{ext} files.
+    Returns the first match found, or None if no match.
+    """
+    container_src_dir = codequery.challenge.task_dir / CONTAINER_SRC_DIR
+    if not container_src_dir.exists():
+        return None
+
+    for ext in extensions:
+        # Search recursively for exact filename match
+        matches = list(container_src_dir.rglob(f"{harness_name}.{ext}"))
+        # Filter out common harness directories
+        matches = _exclude_common_harnesses(matches, container_src_dir)
+        if matches:
+            logger.info("Found harness by name: %s -> %s", harness_name, matches[0])
+            return matches[0]
+
+    return None
+
+
 def find_libfuzzer_harnesses(codequery: CodeQuery) -> list[Path]:
     """Find libfuzzer harnesses in the source directory.
 
@@ -151,19 +173,40 @@ def _rebase_path(task_dir: Path, path: Path) -> Path:
 
 
 def get_harness_source_candidates(codequery: CodeQuery, harness_name: str) -> list[Path]:
-    """Get the list of candidate source files for a harness, in descending order
-    of fuzzy similarity to the harness name.
+    """Get the list of candidate source files for a harness.
+
+    Search order:
+    1. Direct file lookup by name (e.g., "ImagingOne" -> "ImagingOne.java")
+    2. Pattern-based search with exact stem match
+    3. Pattern-based search with fuzzy matching (fallback)
     """
     project_yaml = ProjectYaml(codequery.challenge, codequery.challenge.project_name)
     language = project_yaml.unified_language
 
-    harnesses = []
+    # Determine file extensions based on language
+    if language == Language.JAVA:
+        extensions = ["java"]
+    else:
+        extensions = ["c", "cc", "cpp", "cxx"]
+
+    # 1. Try direct file lookup by harness name (fastest, most reliable)
+    direct_match = _find_harness_by_name(codequery, harness_name, extensions)
+    if direct_match:
+        return [direct_match]
+
+    # 2. Fall back to pattern-based search (looks for fuzzerTestOneInput/LLVMFuzzerTestOneInput)
     if language == Language.JAVA:
         harnesses = find_jazzer_harnesses(codequery)
     else:
         harnesses = find_libfuzzer_harnesses(codequery)
 
-    # Sort harnesses by fuzzy similarity to harness_name
+    # Check for exact stem match first
+    exact_matches = [h for h in harnesses if h.stem.lower() == harness_name.lower()]
+    if exact_matches:
+        logger.info("Found exact harness match for %s: %s", harness_name, exact_matches[0])
+        return exact_matches
+
+    # 3. Fall back to fuzzy matching if no exact match
     harnesses.sort(
         key=lambda x: rapidfuzz.fuzz.ratio(x.name.lower(), harness_name.lower()),
         reverse=True,
