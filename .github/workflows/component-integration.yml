@@ -93,7 +93,7 @@ jobs:
 
       - name: Install uv
         if: steps.should_test.outputs.test != 'false'
-        uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b  # v7.2.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
 
       - name: Setup uv cache
         if: steps.should_test.outputs.test != 'false'
@@ -197,7 +197,7 @@ jobs:
 
       - name: Upload integration test results
         if: always() && steps.should_test.outputs.test != 'false'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7.0.0
         with:
           name: integration-test-results-${{ matrix.component }}-py${{ matrix.python }}
           path: |
