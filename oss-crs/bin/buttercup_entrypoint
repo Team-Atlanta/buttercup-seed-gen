@@ -86,6 +86,10 @@ fi
 if [ -n "$OSS_CRS_LLM_API_URL" ]; then
     export BUTTERCUP_LITELLM_HOSTNAME="$OSS_CRS_LLM_API_URL"
 fi
+if [ -n "$OSS_CRS_LLM_API_KEY_FILE" ] && [ -f "$OSS_CRS_LLM_API_KEY_FILE" ]; then
+    OSS_CRS_LLM_API_KEY="$(cat "$OSS_CRS_LLM_API_KEY_FILE")"
+    export OSS_CRS_LLM_API_KEY
+fi
 if [ -n "$OSS_CRS_LLM_API_KEY" ]; then
     export BUTTERCUP_LITELLM_KEY="$OSS_CRS_LLM_API_KEY"
 fi
