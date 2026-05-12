@@ -16,6 +16,7 @@ from buttercup.common.default_task_loop import TaskLoop
 from buttercup.common.logger import setup_package_logger
 from buttercup.common.maps import CoverageMap
 from buttercup.common.telemetry import CRSActionCategory, init_telemetry, set_crs_attributes
+from buttercup.common.redis_utils import wait_for_redis
 from buttercup.common.utils import setup_periodic_zombie_reaper
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
@@ -233,7 +234,7 @@ def main() -> None:
 
     seconds_sleep = args.timer // 1000
     fuzzer = CoverageBot(
-        Redis.from_url(args.redis_url),
+        wait_for_redis(args.redis_url),
         seconds_sleep,
         args.wdir,
         args.python,

@@ -9,10 +9,10 @@ from pathlib import Path
 from buttercup.common.challenge_task import ChallengeTask
 from buttercup.common.logger import setup_package_logger
 from buttercup.common.project_yaml import ProjectYaml
+from buttercup.common.redis_utils import wait_for_redis
 from buttercup.common.telemetry import init_telemetry
 from buttercup.program_model.codequery import CodeQueryPersistent
 from pydantic_settings import get_subcommand
-from redis import Redis
 
 import buttercup.seed_gen.cli_load_dotenv  # noqa: F401
 from buttercup.seed_gen.config import ProcessCommand, Settings
@@ -33,7 +33,7 @@ def command_server(settings: Settings) -> None:
     if settings.server.corpus_root:
         os.makedirs(settings.server.corpus_root, exist_ok=True)
     init_telemetry("seed-gen")
-    redis = Redis.from_url(settings.server.redis_url)
+    redis = wait_for_redis(settings.server.redis_url)
     seed_gen_bot = SeedGenBot(
         redis,
         settings.server.sleep_time,
